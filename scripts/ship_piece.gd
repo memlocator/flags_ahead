@@ -1,0 +1,34 @@
+class_name ShipPiece
+extends StaticBody3D
+
+
+var piece_type: StringName = &""
+var hp: float = 100.0
+var support: float = 0.0
+var max_support: int = 6
+var resets_stability: bool = false
+var piece_id: int = 0
+
+static var _next_id: int = 0
+
+func _init() -> void:
+	piece_id = _next_id
+	_next_id += 1
+	collision_layer = 2
+	collision_mask = 0
+
+func setup(type: StringName) -> void:
+	piece_type = type
+	var def: Dictionary = PieceDefs.DEFS[type]
+	hp = float(def.hp)
+	max_support = int(def.max_support)
+	resets_stability = bool(def.resets_stability)
+
+func to_dict() -> Dictionary:
+	return {
+		"type": str(piece_type),
+		"position": [global_position.x, global_position.y, global_position.z],
+		"rotation_y": rotation.y,
+		"hp": hp,
+		"support": support,
+	}

@@ -1,0 +1,46 @@
+[gd_scene format=3 uid="uid://main"]
+
+[ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
+[ext_resource type="Script" path="res://scripts/orbit_camera.gd" id="2_cam"]
+[ext_resource type="Script" path="res://scripts/ship_skeleton.gd" id="3_skel"]
+[ext_resource type="Script" path="res://scripts/build_system.gd" id="4_build"]
+
+[node name="root" type="Node3D"]
+script = ExtResource("1_main")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+rotation_degrees = Vector3(-45, 30, 0)
+light_energy = 1.2
+shadow_enabled = true
+
+[node name="Camera3D" type="Camera3D" parent="."]
+script = ExtResource("2_cam")
+
+[node name="HUD" type="CanvasLayer" parent="."]
+
+[node name="Label" type="Label" parent="HUD"]
+offset_left = 10.0
+offset_top = 10.0
+offset_right = 900.0
+offset_bottom = 60.0
+text = "Loading..."
+
+[node name="ShipRoot" type="RigidBody3D" parent="."]
+freeze = true
+
+[node name="KeelGroup" type="Node3D" parent="ShipRoot"]
+script = ExtResource("3_skel")
+
+[node name="PlacedPieces" type="Node3D" parent="ShipRoot"]
+
+[node name="BuildSystem" type="Node3D" parent="."]
+script = ExtResource("4_build")
+
+[node name="BuildPreview" type="Node3D" parent="BuildSystem"]
+
+[node name="PivotNode" type="Node3D" parent="BuildSystem/BuildPreview"]
+visible = false
+
+[node name="GhostMesh" type="Node3D" parent="BuildSystem/BuildPreview/PivotNode"]
