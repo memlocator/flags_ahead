@@ -1,7 +1,8 @@
 extends Node3D
 
 @onready var player              := $Player as CharacterBody3D
-@onready var camera              := $Camera3D as Camera3D
+@onready var camera_pivot        := $CameraPivot
+@onready var camera              := $CameraPivot/SpringArm3D/Camera3D as Camera3D
 @onready var ship_root           := $ShipRoot as RigidBody3D
 @onready var keel_group          := $ShipRoot/KeelGroup as Node3D
 @onready var placed_pieces_node  := $ShipRoot/PlacedPieces as Node3D
@@ -15,8 +16,8 @@ extends Node3D
 func _ready() -> void:
 	keel_group.build()
 
-	camera.target       = player
-	camera.build_system = build_system
+	camera_pivot.target       = player
+	camera_pivot.build_system = build_system
 
 	player.camera = camera
 

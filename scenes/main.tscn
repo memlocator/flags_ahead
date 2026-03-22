@@ -1,46 +1,48 @@
 [gd_scene format=3 uid="uid://main"]
 
-[ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
-[ext_resource type="Script" path="res://scripts/orbit_camera.gd" id="2_cam"]
-[ext_resource type="Script" path="res://scripts/ship_skeleton.gd" id="3_skel"]
-[ext_resource type="Script" path="res://scripts/build_system.gd" id="4_build"]
+[ext_resource type="Script" uid="uid://dsv14mpxd32my" path="res://scripts/main.gd" id="1_main"]
+[ext_resource type="Script" uid="uid://bgrn1eympuwrx" path="res://scripts/orbit_camera.gd" id="2_cam"]
+[ext_resource type="Script" uid="uid://dmns4cwcdeg37" path="res://scripts/ship_skeleton.gd" id="3_skel"]
+[ext_resource type="Script" uid="uid://xd4qfkaidmga" path="res://scripts/build_system.gd" id="4_build"]
 
-[node name="root" type="Node3D"]
+[node name="root" type="Node3D" unique_id=1794945277]
 script = ExtResource("1_main")
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=727766670]
 
-[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
-rotation_degrees = Vector3(-45, 30, 0)
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1591206185]
+transform = Transform3D(0.8660254, -0.35355338, 0.35355338, 0, 0.70710677, 0.70710677, -0.5, -0.6123724, 0.6123724, 0, 0, 0)
 light_energy = 1.2
 shadow_enabled = true
 
-[node name="Camera3D" type="Camera3D" parent="."]
+[node name="Camera3D" type="Camera3D" parent="." unique_id=86509104]
 script = ExtResource("2_cam")
+min_distance = 1.0
+shoulder_collapse_range = 15.0
 
-[node name="HUD" type="CanvasLayer" parent="."]
+[node name="HUD" type="CanvasLayer" parent="." unique_id=2007061907]
 
-[node name="Label" type="Label" parent="HUD"]
+[node name="Label" type="Label" parent="HUD" unique_id=1767336469]
 offset_left = 10.0
 offset_top = 10.0
 offset_right = 900.0
 offset_bottom = 60.0
 text = "Loading..."
 
-[node name="ShipRoot" type="RigidBody3D" parent="."]
+[node name="ShipRoot" type="RigidBody3D" parent="." unique_id=1680913096]
 freeze = true
 
-[node name="KeelGroup" type="Node3D" parent="ShipRoot"]
+[node name="KeelGroup" type="Node3D" parent="ShipRoot" unique_id=933369178]
 script = ExtResource("3_skel")
 
-[node name="PlacedPieces" type="Node3D" parent="ShipRoot"]
+[node name="PlacedPieces" type="Node3D" parent="ShipRoot" unique_id=1901253203]
 
-[node name="BuildSystem" type="Node3D" parent="."]
+[node name="BuildSystem" type="Node3D" parent="." unique_id=2010669341]
 script = ExtResource("4_build")
 
-[node name="BuildPreview" type="Node3D" parent="BuildSystem"]
+[node name="BuildPreview" type="Node3D" parent="BuildSystem" unique_id=1153582493]
 
-[node name="PivotNode" type="Node3D" parent="BuildSystem/BuildPreview"]
+[node name="PivotNode" type="Node3D" parent="BuildSystem/BuildPreview" unique_id=1081247482]
 visible = false
 
-[node name="GhostMesh" type="Node3D" parent="BuildSystem/BuildPreview/PivotNode"]
+[node name="GhostMesh" type="Node3D" parent="BuildSystem/BuildPreview/PivotNode" unique_id=2113617736]

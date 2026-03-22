@@ -87,6 +87,7 @@ func _rebuild_ghost() -> void:
 
 
 func select_piece(type: StringName) -> void:
+	var prev_piece  := selected_piece
 	var was_placing := selected_piece != &""
 	selected_piece = type
 	if type == &"":
@@ -94,6 +95,11 @@ func select_piece(type: StringName) -> void:
 			_support_view = false
 			graph.apply_default_colors(placed_pieces)
 		return
+	if type != prev_piece:
+		var dr: Array = PieceDefs.DEFS[type].get("default_rots", [0.0, 0.0, 0.0])
+		_target_rots[0] = dr[0]; _target_rots[1] = dr[1]; _target_rots[2] = dr[2]
+		_smooth_spin_rot = Basis.IDENTITY
+		_smooth_mirror_spin_rot = Basis.IDENTITY
 	_piece_index = PIECE_CYCLE.find(type)
 	_rebuild_ghost()
 	if not _support_view:
@@ -130,7 +136,6 @@ func _physics_process(delta: float) -> void:
 	var hit_normal: Vector3 = result.normal
 
 	if hit_normal.dot(_last_normal) < 0.9999:
-		_target_rots[0] = 0.0; _target_rots[1] = 0.0; _target_rots[2] = 0.0
 		_smooth_spin_rot = Basis.IDENTITY
 		_smooth_mirror_spin_rot = Basis.IDENTITY
 		_last_normal = hit_normal
@@ -153,8 +158,12 @@ func _physics_process(delta: float) -> void:
 		hit_point = BuildUtils.snap_to_edges(hit_point, hit_normal, sz, spin_rot * base, _collect_edges())
 
 	# Active axis indicator direction (whichever axis is currently selected)
-	var spin_local := Vector3.RIGHT if rot_axis_index == 0 else (Vector3.UP if rot_axis_index == 1 else Vector3.BACK)
-	var spin_world := (base * spin_local).normalized()
+	var spin_world: Vector3
+	match rot_axis_index:
+		0: spin_world = Basis(base.z, _target_rots[2]) * (Basis(base.y, _target_rots[1]) * base.x)
+		1: spin_world = Basis(base.z, _target_rots[2]) * base.y
+		_: spin_world = base.z
+	spin_world = spin_world.normalized()
 
 	# Primary ghost — piece rotates around pivot (hit_point)
 	ghost_pivot.global_position = hit_point
@@ -202,7 +211,8 @@ func _input(event: InputEvent) -> void:
 				rot_axis_index = (rot_axis_index + 1) % 3
 				return
 			KEY_T:
-				_target_rots[0] = 0.0; _target_rots[1] = 0.0; _target_rots[2] = 0.0
+				var dr: Array = PieceDefs.DEFS[selected_piece].get("default_rots", [0.0, 0.0, 0.0])
+				_target_rots[0] = dr[0]; _target_rots[1] = dr[1]; _target_rots[2] = dr[2]
 				_smooth_spin_rot = Basis.IDENTITY
 				_smooth_mirror_spin_rot = Basis.IDENTITY
 				return

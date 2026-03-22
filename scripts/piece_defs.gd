@@ -28,7 +28,7 @@ const DEFS: Dictionary = {
 	&"wall": {
 		"label": "Wall",
 		"size": Vector3(2.0, 1.5, 0.12),
-		"face_axis": 2,
+		"face_axis": 1,  # Y (1.5m) stands upright from floor
 		"weight": 0.8,
 		"material_tier": 0,
 		"hp": 80,
@@ -36,7 +36,7 @@ const DEFS: Dictionary = {
 	&"half_wall": {
 		"label": "Half Wall",
 		"size": Vector3(2.0, 0.75, 0.12),
-		"face_axis": 2,
+		"face_axis": 1,  # Y (0.75m) stands upright from floor
 		"weight": 0.5,
 		"material_tier": 0,
 		"hp": 50,
@@ -44,7 +44,7 @@ const DEFS: Dictionary = {
 	&"window_wall": {
 		"label": "Window Wall",
 		"size": Vector3(1.0, 1.0, 0.12),
-		"face_axis": 2,
+		"face_axis": 1,  # Y (1.0m) stands upright from floor
 		"weight": 0.7,
 		"material_tier": 0,
 		"hp": 70,
@@ -109,7 +109,7 @@ const DEFS: Dictionary = {
 	&"door_frame": {
 		"label": "Door",
 		"size": Vector3(1.0, 2.2, 0.12),
-		"face_axis": 2,  # Z thin face against wall surface
+		"face_axis": 1,  # Y (2.2m) stands upright from floor
 		"weight": 0.6,
 		"material_tier": 0,
 		"hp": 80,

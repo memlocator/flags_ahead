@@ -11,10 +11,10 @@ config_version=5
 [application]
 
 config/name="FlagAhead"
-run/main_scene="uid://main"
+run/main_scene="res://scenes/game.tscn"
 config/features=PackedStringArray("4.6", "Forward Plus")
 config/icon="res://icon.svg"
-config/run/main_scene="res://scenes/main.tscn"
+config/run/main_scene="res://scenes/game.tscn"
 
 [physics]
 

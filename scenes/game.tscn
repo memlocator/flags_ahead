@@ -1,11 +1,25 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://b5e8scx2dch0c"]
 
-[ext_resource type="Script" path="res://scripts/game.gd" id="1_game"]
-[ext_resource type="Script" path="res://scripts/orbit_camera.gd" id="2_cam"]
-[ext_resource type="Script" path="res://scripts/ship_skeleton.gd" id="3_skel"]
-[ext_resource type="Script" path="res://scripts/build_system.gd" id="4_build"]
-[ext_resource type="Script" path="res://scripts/player_controller.gd" id="5_player"]
-[ext_resource type="Script" path="res://scripts/toolbar.gd" id="6_toolbar"]
+[ext_resource type="Script" uid="uid://cul2myf5gpj0t" path="res://scripts/game.gd" id="1_game"]
+[ext_resource type="Script" uid="uid://bgrn1eympuwrx" path="res://scripts/orbit_camera.gd" id="2_cam"]
+[ext_resource type="Script" uid="uid://dmns4cwcdeg37" path="res://scripts/ship_skeleton.gd" id="3_skel"]
+[ext_resource type="Script" uid="uid://xd4qfkaidmga" path="res://scripts/build_system.gd" id="4_build"]
+[ext_resource type="Script" uid="uid://bctc6usitv0m3" path="res://scripts/player_controller.gd" id="5_player"]
+[ext_resource type="Script" uid="uid://btgbwjmbhdf38" path="res://scripts/toolbar.gd" id="6_toolbar"]
+[ext_resource type="PackedScene" uid="uid://clh3bx7tu52ml" path="res://assets/characters/character.glb" id="7_char"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_env"]
+
+[sub_resource type="Sky" id="Sky_env"]
+sky_material = SubResource("ProceduralSkyMaterial_env")
+
+[sub_resource type="Environment" id="Environment_world"]
+background_mode = 2
+sky = SubResource("Sky_env")
+ambient_light_source = 2
+ambient_light_color = Color(0.6, 0.65, 0.75, 1)
+ambient_light_energy = 0.5
+reflected_light_source = 2
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_ground"]
 size = Vector3(60, 0.5, 60)
@@ -20,25 +34,20 @@ albedo_color = Color(0.25, 0.35, 0.2, 1)
 radius = 0.3
 height = 1.8
 
-[sub_resource type="CapsuleMesh" id="CapsuleMesh_player"]
-radius = 0.3
-height = 1.8
-
-[sub_resource type="StandardMaterial3D" id="Mat_player"]
-albedo_color = Color(0.8, 0.55, 0.3, 1)
-
 [node name="root" type="Node3D" unique_id=1653196456]
 script = ExtResource("1_game")
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=141689472]
+environment = SubResource("Environment_world")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1354729716]
-rotation_degrees = Vector3(-50, 30, 0)
+transform = Transform3D(0.8660254, -0.38302222, 0.32139382, 0, 0.64278764, 0.76604444, -0.5, -0.66341394, 0.5566704, 0, 0, 0)
 light_energy = 1.2
+light_angular_distance = 0.5
 shadow_enabled = true
 
 [node name="Ground" type="StaticBody3D" parent="." unique_id=786087831]
-position = Vector3(0, -0.25, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.25, 0)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Ground" unique_id=2049438336]
 shape = SubResource("BoxShape3D_ground")
@@ -48,18 +57,27 @@ mesh = SubResource("BoxMesh_ground")
 surface_material_override/0 = SubResource("Mat_ground")
 
 [node name="Player" type="CharacterBody3D" parent="." unique_id=1853105257]
-position = Vector3(3, 1.0, 5)
+transform = Transform3D(-0.75, 0, -1.13246855e-07, 0, 0.75, 0, 1.13246855e-07, 0, -0.75, 3, 1, 5)
 script = ExtResource("5_player")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Player" unique_id=1649244819]
 shape = SubResource("CapsuleShape3D_player")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Player" unique_id=1012472058]
-mesh = SubResource("CapsuleMesh_player")
-surface_material_override/0 = SubResource("Mat_player")
+[node name="CharacterMesh" parent="Player" unique_id=859554600 instance=ExtResource("7_char")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.9, 0)
 
-[node name="Camera3D" type="Camera3D" parent="." unique_id=846003860]
+[node name="CameraPivot" type="Node3D" parent="." unique_id=846003860]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5784817, 0, 5.097081)
 script = ExtResource("2_cam")
+shoulder_offset = 1.0
+zoom_step = 0.75
+min_distance = 0.0
+
+[node name="SpringArm3D" type="SpringArm3D" parent="CameraPivot" unique_id=982765431]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.7700791, 2.7339497, 4.8854237)
+spring_length = 2.0
+
+[node name="Camera3D" type="Camera3D" parent="CameraPivot/SpringArm3D" unique_id=123456789]
 
 [node name="ShipRoot" type="RigidBody3D" parent="." unique_id=614811410]
 freeze = true
