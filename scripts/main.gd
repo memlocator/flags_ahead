@@ -1,6 +1,5 @@
 extends Node3D
 
-
 @onready var ship_root        = $ShipRoot
 @onready var keel_group       = $ShipRoot/KeelGroup
 @onready var placed_pieces_node = $ShipRoot/PlacedPieces
@@ -37,7 +36,7 @@ func _update_hud() -> void:
 	var piece_label : String = PieceDefs.DEFS[build_system.selected_piece].label
 	var count: int  = build_system.placed_pieces.size()
 	var sym         := "ON" if build_system.symmetry_enabled else "OFF"
-	hud_label.text  = "[B] Mode: %s  |  [TAB] Piece: %s  |  [M] Symmetry: %s  |  Placed: %d\nRMB=orbit  Scroll=zoom  |  [BUILD] LMB=place  RMB=remove  Scroll=rotate" \
+	hud_label.text  = "[B] Mode: %s  |  [TAB] Piece: %s  |  [M] Sym: %s  |  Placed: %d\nRMB=orbit  Scroll=zoom  |  [BUILD] LMB=place  RMB=remove  Scroll=rotate" \
 		% [mode, piece_label, sym, count]
 
 

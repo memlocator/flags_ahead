@@ -23,6 +23,11 @@ func setup(type: StringName) -> void:
 	hp = float(def.hp)
 	max_support = int(def.max_support)
 	resets_stability = bool(def.resets_stability)
+	var cs := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = def.size
+	cs.shape = shape
+	add_child(cs)
 
 func to_dict() -> Dictionary:
 	return {

@@ -11,31 +11,24 @@ static func half_out(size: Vector3, face_axis: int) -> float:
 		_: return size.z / 2.0
 
 
-# Full 3D basis so that the piece's face_axis aligns with the surface normal.
-# piece_rot spins the piece around that normal axis.
-#
-# Convention (right-handed, checked per face_axis):
-#   face_axis=2 (Z): base = Basis(t1, t2=n×t1, n),  spin around local Z
-#   face_axis=1 (Y): base = Basis(t1, n,   t1×n),   spin around local Y
-#   face_axis=0 (X): base = Basis(n,  t1,  n×t1),   spin around local X
-# where t1 = (UP or BACK) × n, choosing BACK when n ≈ UP.
-static func surface_basis(normal: Vector3, face_axis: int, piece_rot: float) -> Basis:
+# Base orientation: aligns piece face_axis with the surface normal, no spin.
+static func surface_base(normal: Vector3, face_axis: int) -> Basis:
 	var n   := normal.normalized()
 	var ref := Vector3.UP if absf(n.dot(Vector3.UP)) < 0.95 else Vector3.BACK
 	var t1  := ref.cross(n).normalized()
-	var base: Basis
-	var spin: Vector3
 	match face_axis:
-		0:
-			base = Basis(n, n.cross(t1), -t1)
-			spin = Vector3.RIGHT
-		1:
-			base = Basis(t1, n,          t1.cross(n))
-			spin = Vector3.UP
-		_:
-			base = Basis(t1, n.cross(t1), n)
-			spin = Vector3.BACK
-	return base * Basis(spin, piece_rot)
+		0: return Basis(n, n.cross(t1), -t1)
+		1: return Basis(t1, n,          t1.cross(n))
+		_: return Basis(t1, n.cross(t1), n)
+
+
+# Full basis with spin applied in world space around the chosen axis.
+static func surface_basis(normal: Vector3, face_axis: int, piece_rot: float, rot_axis: int = 0) -> Basis:
+	var base := surface_base(normal, face_axis)
+	const SPIN_AXES := [Vector3.RIGHT, Vector3.UP, Vector3.BACK]
+	var spin_v: Vector3 = SPIN_AXES[rot_axis]
+	var spin_world := (base * spin_v).normalized()
+	return Basis(spin_world, piece_rot) * base
 
 
 # World-space center of the piece.
