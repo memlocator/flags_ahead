@@ -84,7 +84,7 @@ static func _build_window(root: Node3D, _sz: Vector3, mat: Material) -> void:
 	root.add_child(_box_mi(Vector3(1.0, 0.25, 0.12), Vector3(0,  0.375, 0), mat))
 	root.add_child(_box_mi(Vector3(0.15, 0.5, 0.12), Vector3(-0.425, 0, 0), mat))
 	root.add_child(_box_mi(Vector3(0.15, 0.5, 0.12), Vector3( 0.425, 0, 0), mat))
-	root.add_child(_box_mi(Vector3(0.7, 0.5, 0.03), Vector3.ZERO, _glass_mat))
+	root.add_child(_box_mi(Vector3(0.7, 0.5, 0.03), Vector3.ZERO, mat))
 
 
 static func _build_mast(root: Node3D, sz: Vector3, mat: Material) -> void:

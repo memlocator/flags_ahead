@@ -19,27 +19,22 @@ func compute(placed_pieces: Array) -> void:
 		piece.support = 0.0
 
 	var queue: Array[ShipPiece] = []
-	var visited: Dictionary = {}
 
-	# Phase 1: ground pieces adjacent to keel or iron-reinforced
+	# Phase 1: seed grounded pieces at full support
 	for piece: ShipPiece in placed_pieces:
 		if _is_grounded(piece):
 			piece.support = 1.0
 			queue.append(piece)
-			visited[piece.piece_id] = true
 
-	# Phase 2: BFS propagation
+	# Phase 2: Dijkstra-style propagation — re-queue whenever a better path is found
 	while queue.size() > 0:
 		var current: ShipPiece = queue.pop_front()
 		for other: ShipPiece in placed_pieces:
-			if visited.has(other.piece_id):
-				continue
 			if current.global_position.distance_to(other.global_position) < 2.0:
 				var decay := 1.0 / float(other.max_support)
 				var new_sup := current.support - decay
 				if new_sup > other.support:
 					other.support = maxf(0.0, new_sup)
-					visited[other.piece_id] = true
 					queue.append(other)
 
 	_update_colors(placed_pieces)

@@ -71,4 +71,6 @@ func _update_position() -> void:
 	cam_pos += right * shoulder_offset
 
 	global_position = cam_pos
-	look_at(origin + right * shoulder_offset * 0.5 + Vector3.UP * 0.4, Vector3.UP)
+	var look_target := origin + right * shoulder_offset * 0.5 + Vector3.UP * 0.4
+	if not global_position.is_equal_approx(look_target):
+		look_at(look_target, Vector3.UP)

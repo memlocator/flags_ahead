@@ -30,10 +30,11 @@ func setup(type: StringName) -> void:
 	add_child(cs)
 
 func to_dict() -> Dictionary:
+	var q := basis.get_rotation_quaternion()
 	return {
 		"type": str(piece_type),
 		"position": [global_position.x, global_position.y, global_position.z],
-		"rotation_y": rotation.y,
+		"basis_q": [q.x, q.y, q.z, q.w],
 		"hp": hp,
 		"support": support,
 	}

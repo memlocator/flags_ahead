@@ -9,9 +9,12 @@ extends Node3D
 @export var ghost_mesh_node: Node3D
 
 @export var rotation_step_deg: float = 15.0
+@export var rotation_smooth: float = 14.0
 
 var selected_piece: StringName = &"plank"
-var piece_rots: Array[float] = [0.0, 0.0, 0.0]
+var _target_rots: Array[float] = [0.0, 0.0, 0.0]
+var _smooth_spin_rot: Basis = Basis.IDENTITY
+var _smooth_mirror_spin_rot: Basis = Basis.IDENTITY
 var rot_axis_index: int = 0
 
 var placed_pieces: Array[ShipPiece] = []
@@ -99,7 +102,7 @@ func select_piece(type: StringName) -> void:
 	_rebuild_ghost()
 
 
-func _physics_process(_delta: float) -> void:
+func _physics_process(delta: float) -> void:
 	if not build_camera or selected_piece == &"":
 		ghost_pivot.visible = false
 		_ghost_pivot_mirror.visible = false
@@ -127,10 +130,10 @@ func _physics_process(_delta: float) -> void:
 	var hit_point: Vector3 = result.position
 	var hit_normal: Vector3 = result.normal
 
-	if hit_normal.dot(_last_normal) < 0.99:
-		piece_rots[0] = 0.0
-		piece_rots[1] = 0.0
-		piece_rots[2] = 0.0
+	if hit_normal.dot(_last_normal) < 0.9999:
+		_target_rots[0] = 0.0; _target_rots[1] = 0.0; _target_rots[2] = 0.0
+		_smooth_spin_rot = Basis.IDENTITY
+		_smooth_mirror_spin_rot = Basis.IDENTITY
 		_last_normal = hit_normal
 
 	var def: Dictionary = PieceDefs.DEFS[selected_piece]
@@ -143,9 +146,11 @@ func _physics_process(_delta: float) -> void:
 
 	_current_normal = hit_normal
 
-	# Compute base orientation and combined spin rotation (all three axes)
-	var base     := BuildUtils.surface_base(hit_normal, fa)
-	var spin_rot := Basis(base.z, piece_rots[2]) * Basis(base.y, piece_rots[1]) * Basis(base.x, piece_rots[0])
+	# Compute base orientation; slerp smooth spin toward target
+	var base         := BuildUtils.surface_base(hit_normal, fa)
+	var target_rot   := Basis(base.z, _target_rots[2]) * Basis(base.y, _target_rots[1]) * Basis(base.x, _target_rots[0])
+	_smooth_spin_rot  = _smooth_spin_rot.slerp(target_rot, minf(delta * rotation_smooth, 1.0))
+	var spin_rot     := _smooth_spin_rot
 
 	# Active axis indicator direction (whichever axis is currently selected)
 	var spin_local := Vector3.RIGHT if rot_axis_index == 0 else (Vector3.UP if rot_axis_index == 1 else Vector3.BACK)
@@ -176,7 +181,9 @@ func _physics_process(_delta: float) -> void:
 		var m_hit    := BuildUtils.reflect_point(hit_point, symmetry_origin, symmetry_normal)
 		var m_normal := BuildUtils.reflect_dir(hit_normal, symmetry_normal)
 		var m_base   := BuildUtils.surface_base(m_normal, fa)
-		var m_rot    := Basis(m_base.z, -piece_rots[2]) * Basis(m_base.y, -piece_rots[1]) * Basis(m_base.x, -piece_rots[0])
+		var m_target := Basis(m_base.z, -_target_rots[2]) * Basis(m_base.y, -_target_rots[1]) * Basis(m_base.x, -_target_rots[0])
+		_smooth_mirror_spin_rot = _smooth_mirror_spin_rot.slerp(m_target, minf(delta * rotation_smooth, 1.0))
+		var m_rot    := _smooth_mirror_spin_rot
 		_ghost_pivot_mirror.global_position = m_hit
 		_ghost_pivot_mirror.rotation        = Vector3.ZERO
 		_ghost_mesh_node_mirror.position    = m_rot * (m_normal * h_out)
@@ -195,9 +202,9 @@ func _input(event: InputEvent) -> void:
 				rot_axis_index = (rot_axis_index + 1) % 3
 				return
 			KEY_T:
-				piece_rots[0] = 0.0
-				piece_rots[1] = 0.0
-				piece_rots[2] = 0.0
+				_target_rots[0] = 0.0; _target_rots[1] = 0.0; _target_rots[2] = 0.0
+				_smooth_spin_rot = Basis.IDENTITY
+				_smooth_mirror_spin_rot = Basis.IDENTITY
 				return
 			KEY_M:
 				symmetry_enabled = not symmetry_enabled
@@ -226,12 +233,12 @@ func _input(event: InputEvent) -> void:
 			MOUSE_BUTTON_WHEEL_UP:
 				if selected_piece != &"":
 					var step := deg_to_rad(rotation_step_deg * (0.5 if Input.is_key_pressed(KEY_SHIFT) else 1.0))
-					piece_rots[rot_axis_index] += step
+					_target_rots[rot_axis_index] += step
 					get_viewport().set_input_as_handled()
 			MOUSE_BUTTON_WHEEL_DOWN:
 				if selected_piece != &"":
 					var step := deg_to_rad(rotation_step_deg * (0.5 if Input.is_key_pressed(KEY_SHIFT) else 1.0))
-					piece_rots[rot_axis_index] -= step
+					_target_rots[rot_axis_index] -= step
 					get_viewport().set_input_as_handled()
 
 
@@ -274,9 +281,9 @@ func _remove_piece_at_cursor() -> void:
 
 	if node is ShipPiece:
 		placed_pieces.erase(node)
+		emit_signal("piece_removed", node as ShipPiece)
 		node.queue_free()
 		stability.compute(placed_pieces)
-		emit_signal("piece_removed", node as ShipPiece)
 
 
 func _collect_edge_ys() -> Array[float]:
@@ -289,8 +296,10 @@ func _collect_edge_ys() -> Array[float]:
 				edges.append_array(BuildUtils.body_edge_ys(child as StaticBody3D))
 
 	for piece: ShipPiece in placed_pieces:
-		var h: float = PieceDefs.DEFS[piece.piece_type].size.y / 2.0
-		edges.append(piece.global_position.y + h)
-		edges.append(piece.global_position.y - h)
+		var sz: Vector3 = PieceDefs.DEFS[piece.piece_type].size
+		var b := piece.global_basis
+		var half_y := absf(b.x.y) * sz.x * 0.5 + absf(b.y.y) * sz.y * 0.5 + absf(b.z.y) * sz.z * 0.5
+		edges.append(piece.global_position.y + half_y)
+		edges.append(piece.global_position.y - half_y)
 
 	return edges

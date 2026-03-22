@@ -1,0 +1,92 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/game.gd" id="1_game"]
+[ext_resource type="Script" path="res://scripts/orbit_camera.gd" id="2_cam"]
+[ext_resource type="Script" path="res://scripts/ship_skeleton.gd" id="3_skel"]
+[ext_resource type="Script" path="res://scripts/build_system.gd" id="4_build"]
+[ext_resource type="Script" path="res://scripts/player_controller.gd" id="5_player"]
+[ext_resource type="Script" path="res://scripts/toolbar.gd" id="6_toolbar"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ground"]
+size = Vector3(60, 0.5, 60)
+
+[sub_resource type="BoxMesh" id="BoxMesh_ground"]
+size = Vector3(60, 0.5, 60)
+
+[sub_resource type="StandardMaterial3D" id="Mat_ground"]
+albedo_color = Color(0.25, 0.35, 0.2, 1)
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_player"]
+radius = 0.3
+height = 1.8
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_player"]
+radius = 0.3
+height = 1.8
+
+[sub_resource type="StandardMaterial3D" id="Mat_player"]
+albedo_color = Color(0.8, 0.55, 0.3, 1)
+
+[node name="root" type="Node3D" unique_id=1653196456]
+script = ExtResource("1_game")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=141689472]
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1354729716]
+rotation_degrees = Vector3(-50, 30, 0)
+light_energy = 1.2
+shadow_enabled = true
+
+[node name="Ground" type="StaticBody3D" parent="." unique_id=786087831]
+position = Vector3(0, -0.25, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Ground" unique_id=2049438336]
+shape = SubResource("BoxShape3D_ground")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Ground" unique_id=1231672845]
+mesh = SubResource("BoxMesh_ground")
+surface_material_override/0 = SubResource("Mat_ground")
+
+[node name="Player" type="CharacterBody3D" parent="." unique_id=1853105257]
+position = Vector3(3, 1.0, 5)
+script = ExtResource("5_player")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Player" unique_id=1649244819]
+shape = SubResource("CapsuleShape3D_player")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Player" unique_id=1012472058]
+mesh = SubResource("CapsuleMesh_player")
+surface_material_override/0 = SubResource("Mat_player")
+
+[node name="Camera3D" type="Camera3D" parent="." unique_id=846003860]
+script = ExtResource("2_cam")
+
+[node name="ShipRoot" type="RigidBody3D" parent="." unique_id=614811410]
+freeze = true
+
+[node name="KeelGroup" type="Node3D" parent="ShipRoot" unique_id=1531864649]
+script = ExtResource("3_skel")
+
+[node name="PlacedPieces" type="Node3D" parent="ShipRoot" unique_id=1577087030]
+
+[node name="BuildSystem" type="Node3D" parent="." unique_id=196088708]
+script = ExtResource("4_build")
+
+[node name="BuildPreview" type="Node3D" parent="BuildSystem" unique_id=1695601637]
+
+[node name="PivotNode" type="Node3D" parent="BuildSystem/BuildPreview" unique_id=1910607680]
+visible = false
+
+[node name="GhostMesh" type="Node3D" parent="BuildSystem/BuildPreview/PivotNode" unique_id=638070358]
+
+[node name="Toolbar" type="CanvasLayer" parent="." unique_id=1118348052]
+script = ExtResource("6_toolbar")
+
+[node name="HUD" type="CanvasLayer" parent="." unique_id=1394111490]
+
+[node name="Label" type="Label" parent="HUD" unique_id=747164874]
+offset_left = 10.0
+offset_top = 10.0
+offset_right = 920.0
+offset_bottom = 60.0
+text = "Loading..."

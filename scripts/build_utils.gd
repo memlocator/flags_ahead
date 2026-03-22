@@ -22,19 +22,6 @@ static func surface_base(normal: Vector3, face_axis: int) -> Basis:
 		_: return Basis(t1, n.cross(t1), n)
 
 
-# Full basis with spin applied in world space around the chosen axis.
-static func surface_basis(normal: Vector3, face_axis: int, piece_rot: float, rot_axis: int = 0) -> Basis:
-	var base := surface_base(normal, face_axis)
-	const SPIN_AXES := [Vector3.RIGHT, Vector3.UP, Vector3.BACK]
-	var spin_v: Vector3 = SPIN_AXES[rot_axis]
-	var spin_world := (base * spin_v).normalized()
-	return Basis(spin_world, piece_rot) * base
-
-
-# World-space center of the piece.
-static func world_center(hit_point: Vector3, normal: Vector3, h_out: float) -> Vector3:
-	return hit_point + normal * h_out
-
 
 # --- Snapping ---
 
