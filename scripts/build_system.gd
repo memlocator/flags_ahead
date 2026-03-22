@@ -18,7 +18,8 @@ var _smooth_mirror_spin_rot: Basis = Basis.IDENTITY
 var rot_axis_index: int = 0
 
 var placed_pieces: Array[ShipPiece] = []
-var stability := StabilitySystem.new()
+var graph := StructuralGraph.new()
+var _support_view: bool = false
 
 # Symmetry — reflects placements across a plane defined by origin + normal
 var symmetry_enabled: bool = false
@@ -50,7 +51,6 @@ var _axis_indicator: MeshInstance3D
 func _ready() -> void:
 	_setup_mirror_ghost()
 	await get_tree().process_frame
-	_refresh_keel_refs()
 	_rebuild_ghost()
 	_setup_axis_indicator()
 
@@ -61,15 +61,6 @@ func _setup_mirror_ghost() -> void:
 	_ghost_pivot_mirror.add_child(_ghost_mesh_node_mirror)
 	_ghost_pivot_mirror.visible = false
 	add_child(_ghost_pivot_mirror)
-
-
-func _refresh_keel_refs() -> void:
-	stability.keel_parts.clear()
-	var keel_group := ship_root.get_node_or_null("KeelGroup") as Node3D
-	if keel_group:
-		for child: Node in keel_group.get_children():
-			stability.keel_parts.append(child)
-
 
 
 func _setup_axis_indicator() -> void:
@@ -96,11 +87,18 @@ func _rebuild_ghost() -> void:
 
 
 func select_piece(type: StringName) -> void:
+	var was_placing := selected_piece != &""
 	selected_piece = type
 	if type == &"":
+		if was_placing:
+			_support_view = false
+			graph.apply_default_colors(placed_pieces)
 		return
 	_piece_index = PIECE_CYCLE.find(type)
 	_rebuild_ghost()
+	if not _support_view:
+		_support_view = true
+		graph.apply_support_colors(placed_pieces)
 
 
 func _physics_process(delta: float) -> void:
@@ -248,12 +246,16 @@ func _input(event: InputEvent) -> void:
 
 
 func _place_piece() -> void:
+	var space := get_world_3d().direct_space_state
 	var piece := _spawn_piece(selected_piece, _ghost_world_center, ghost_mesh_node.basis)
+	graph.add_piece(piece, space)
 
 	if symmetry_enabled:
-		_spawn_piece(selected_piece, _ghost_mirror_center, _ghost_mirror_basis)
+		var mirror := _spawn_piece(selected_piece, _ghost_mirror_center, _ghost_mirror_basis)
+		graph.add_piece(mirror, space)
 
-	stability.compute(placed_pieces)
+	if _support_view:
+		graph.apply_support_colors(placed_pieces)
 	emit_signal("piece_placed", piece)
 
 
@@ -286,9 +288,11 @@ func _remove_piece_at_cursor() -> void:
 
 	if node is ShipPiece:
 		placed_pieces.erase(node)
+		graph.remove_piece(node as ShipPiece)
 		emit_signal("piece_removed", node as ShipPiece)
 		node.queue_free()
-		stability.compute(placed_pieces)
+		if _support_view:
+			graph.apply_support_colors(placed_pieces)
 
 
 func _collect_edges() -> Array:

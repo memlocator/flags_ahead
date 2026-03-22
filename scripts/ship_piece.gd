@@ -5,8 +5,7 @@ extends StaticBody3D
 var piece_type: StringName = &""
 var hp: float = 100.0
 var support: float = 0.0
-var max_support: int = 6
-var resets_stability: bool = false
+var is_grounded: bool = false
 var piece_id: int = 0
 
 static var _next_id: int = 0
@@ -21,8 +20,6 @@ func setup(type: StringName) -> void:
 	piece_type = type
 	var def: Dictionary = PieceDefs.DEFS[type]
 	hp = float(def.hp)
-	max_support = int(def.max_support)
-	resets_stability = bool(def.resets_stability)
 	var cs := CollisionShape3D.new()
 	var shape := BoxShape3D.new()
 	shape.size = def.size
