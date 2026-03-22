@@ -2,33 +2,45 @@ class_name BuildUtils
 
 # --- Placement geometry ---
 
-# Distance from hit_point to piece center along the normal.
-# Vertical surfaces: piece extends outward (long axis = normal), end sits at hit_point.
-# Horizontal surfaces: piece rests on top (Y-face down).
-static func half_out(normal: Vector3, size: Vector3) -> float:
-	if absf(normal.y) > 0.9:
-		return size.y / 2.0
-	return size.x / 2.0
+# Offset from hit_point to piece center along the normal.
+# face_axis: 0=X, 1=Y, 2=Z — which local axis presses against the surface.
+static func half_out(size: Vector3, face_axis: int) -> float:
+	match face_axis:
+		0: return size.x / 2.0
+		1: return size.y / 2.0
+		_: return size.z / 2.0
 
 
-# Y rotation that aligns local X (long axis) with the horizontal component of the normal.
-# Derived from: after Ry(θ), local X = (cosθ, 0, −sinθ). Set = normalize(N.x, 0, N.z).
-static func auto_rot(normal: Vector3) -> float:
-	if absf(normal.y) < 0.9:
-		return atan2(-normal.z, normal.x)
-	return 0.0
+# Full 3D basis so that the piece's face_axis aligns with the surface normal.
+# piece_rot spins the piece around that normal axis.
+#
+# Convention (right-handed, checked per face_axis):
+#   face_axis=2 (Z): base = Basis(t1, t2=n×t1, n),  spin around local Z
+#   face_axis=1 (Y): base = Basis(t1, n,   t1×n),   spin around local Y
+#   face_axis=0 (X): base = Basis(n,  t1,  n×t1),   spin around local X
+# where t1 = (UP or BACK) × n, choosing BACK when n ≈ UP.
+static func surface_basis(normal: Vector3, face_axis: int, piece_rot: float) -> Basis:
+	var n   := normal.normalized()
+	var ref := Vector3.UP if absf(n.dot(Vector3.UP)) < 0.95 else Vector3.BACK
+	var t1  := ref.cross(n).normalized()
+	var base: Basis
+	var spin: Vector3
+	match face_axis:
+		0:
+			base = Basis(n, n.cross(t1), -t1)
+			spin = Vector3.RIGHT
+		1:
+			base = Basis(t1, n,          t1.cross(n))
+			spin = Vector3.UP
+		_:
+			base = Basis(t1, n.cross(t1), n)
+			spin = Vector3.BACK
+	return base * Basis(spin, piece_rot)
 
 
-# World-space center of the piece, accounting for piece_rot rotating the normal offset.
-static func world_center(hit_point: Vector3, normal: Vector3, h_out: float, piece_rot: float) -> Vector3:
-	var off := normal * h_out
-	var c := cos(piece_rot)
-	var s := sin(piece_rot)
-	return hit_point + Vector3(
-		off.x * c - off.z * s,
-		off.y,
-		off.x * s + off.z * c
-	)
+# World-space center of the piece.
+static func world_center(hit_point: Vector3, normal: Vector3, h_out: float) -> Vector3:
+	return hit_point + normal * h_out
 
 
 # --- Snapping ---
@@ -74,13 +86,6 @@ static func reflect_point(p: Vector3, origin: Vector3, normal: Vector3) -> Vecto
 # Reflect a direction vector (no translation).
 static func reflect_dir(v: Vector3, normal: Vector3) -> Vector3:
 	return v - 2.0 * v.dot(normal) * normal
-
-
-# Y rotation of the mirrored piece across the given plane normal.
-static func mirror_rot(piece_rot: float, auto_rotation: float, normal: Vector3, sym_normal: Vector3) -> float:
-	var m_normal := reflect_dir(normal, sym_normal)
-	var m_auto := auto_rot(m_normal)
-	return -piece_rot + m_auto
 
 
 # --- Scene helpers ---

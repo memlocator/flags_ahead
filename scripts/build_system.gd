@@ -106,35 +106,34 @@ func _physics_process(_delta: float) -> void:
 		piece_rot = 0.0
 		_last_normal = hit_normal
 
-	var sz: Vector3 = PieceDefs.DEFS[selected_piece].size
-	var h_out    := BuildUtils.half_out(hit_normal, sz)
-	var a_rot    := BuildUtils.auto_rot(hit_normal)
+	var def: Dictionary = PieceDefs.DEFS[selected_piece]
+	var sz: Vector3     = def.size
+	var fa: int         = def.get("face_axis", 2)
+	var h_out           := BuildUtils.half_out(sz, fa)
 
 	if absf(hit_normal.y) < 0.9:
 		hit_point = BuildUtils.snap_vertical(hit_point, sz, _collect_edge_ys())
 
-	# World center must be computed before the mirror ghost reads it
-	_ghost_world_center = BuildUtils.world_center(hit_point, hit_normal, h_out, piece_rot)
+	_ghost_world_center = BuildUtils.world_center(hit_point, hit_normal, h_out)
 	_current_normal = hit_normal
 
 	# Primary ghost
 	ghost_pivot.global_position = hit_point
-	ghost_pivot.rotation.y     = piece_rot
-	ghost_mesh_node.position   = hit_normal * h_out
-	ghost_mesh_node.rotation.y = a_rot
-	ghost_pivot.visible        = true
-	_ghost_valid               = true
+	ghost_pivot.rotation        = Vector3.ZERO
+	ghost_mesh_node.position    = hit_normal * h_out
+	ghost_mesh_node.basis       = BuildUtils.surface_basis(hit_normal, fa, piece_rot)
+	ghost_pivot.visible         = true
+	_ghost_valid                = true
 
 	# Mirror ghost
 	if symmetry_enabled:
 		var m_hit    := BuildUtils.reflect_point(hit_point, symmetry_origin, symmetry_normal)
 		var m_normal := BuildUtils.reflect_dir(hit_normal, symmetry_normal)
-		var m_arot   := BuildUtils.auto_rot(m_normal)
-		_ghost_pivot_mirror.global_position      = m_hit
-		_ghost_pivot_mirror.rotation.y           = -piece_rot
-		_ghost_mesh_node_mirror.global_position  = BuildUtils.reflect_point(_ghost_world_center, symmetry_origin, symmetry_normal)
-		_ghost_mesh_node_mirror.rotation.y       = m_arot
-		_ghost_pivot_mirror.visible              = true
+		_ghost_pivot_mirror.global_position = m_hit
+		_ghost_pivot_mirror.rotation        = Vector3.ZERO
+		_ghost_mesh_node_mirror.position    = m_normal * h_out
+		_ghost_mesh_node_mirror.basis       = BuildUtils.surface_basis(m_normal, fa, -piece_rot)
+		_ghost_pivot_mirror.visible         = true
 	else:
 		_ghost_pivot_mirror.visible = false
 
@@ -175,24 +174,26 @@ func _input(event: InputEvent) -> void:
 
 
 func _place_piece() -> void:
-	var piece := _spawn_piece(selected_piece, _ghost_world_center, piece_rot + ghost_mesh_node.rotation.y)
+	var fa: int = PieceDefs.DEFS[selected_piece].get("face_axis", 2)
+	var piece := _spawn_piece(selected_piece, _ghost_world_center,
+			BuildUtils.surface_basis(_current_normal, fa, piece_rot))
 
 	if symmetry_enabled:
 		var m_center := BuildUtils.reflect_point(_ghost_world_center, symmetry_origin, symmetry_normal)
-		var m_rot    := BuildUtils.mirror_rot(piece_rot, ghost_mesh_node.rotation.y, _current_normal, symmetry_normal)
-		_spawn_piece(selected_piece, m_center, m_rot)
+		var m_normal := BuildUtils.reflect_dir(_current_normal, symmetry_normal)
+		_spawn_piece(selected_piece, m_center, BuildUtils.surface_basis(m_normal, fa, -piece_rot))
 
 	stability.compute(placed_pieces)
 	emit_signal("piece_placed", piece)
 
 
-func _spawn_piece(type: StringName, pos: Vector3, rot_y: float) -> ShipPiece:
+func _spawn_piece(type: StringName, pos: Vector3, piece_basis: Basis) -> ShipPiece:
 	var piece := ShipPiece.new()
 	piece.setup(type)
 	piece.add_child(PieceMeshBuilder.build_piece(type))
 	placed_pieces_node.add_child(piece)
 	piece.global_position = pos
-	piece.rotation.y = rot_y
+	piece.basis = piece_basis
 	placed_pieces.append(piece)
 	return piece
 
