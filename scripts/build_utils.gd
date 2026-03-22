@@ -27,32 +27,46 @@ static func surface_base(normal: Vector3, face_axis: int) -> Basis:
 
 const SNAP_THRESHOLD := 0.22
 
-# Snap hit_point.y so piece top/bottom aligns with a nearby edge.
-static func snap_vertical(hit_point: Vector3, size: Vector3, edge_ys: Array[float]) -> Vector3:
-	var half_y := size.y / 2.0
-	var best_y := hit_point.y
-	var best_dist := SNAP_THRESHOLD
-
-	for edge_y: float in edge_ys:
-		for candidate: float in [edge_y + half_y, edge_y - half_y]:
-			var d := absf(hit_point.y - candidate)
-			if d < best_dist:
-				best_dist = d
-				best_y = candidate
-
-	return Vector3(hit_point.x, best_y, hit_point.z)
-
-
-# Collect top/bottom Y edges from a StaticBody3D with a BoxShape3D child.
-static func body_edge_ys(body: StaticBody3D) -> Array[float]:
+# Collect edges of a StaticBody3D (BoxShape3D child) along a world axis (0=X,1=Y,2=Z).
+static func body_edges_on_axis(body: StaticBody3D, axis: int) -> Array[float]:
 	var edges: Array[float] = []
 	for child: Node in body.get_children():
 		if child is CollisionShape3D and child.shape is BoxShape3D:
-			var half_y := (child.shape as BoxShape3D).size.y / 2.0
-			edges.append(body.global_position.y + half_y)
-			edges.append(body.global_position.y - half_y)
+			var sz  := (child.shape as BoxShape3D).size
+			var b   := body.global_basis
+			var half := absf(b.x[axis]) * sz.x * 0.5 + absf(b.y[axis]) * sz.y * 0.5 + absf(b.z[axis]) * sz.z * 0.5
+			edges.append(body.global_position[axis] + half)
+			edges.append(body.global_position[axis] - half)
 			break
 	return edges
+
+
+# Snap hit_point along the two surface-tangent axes (skip the axis most aligned
+# with hit_normal). Uses the new piece's world-space basis for correct extents.
+static func snap_to_edges(hit_point: Vector3, hit_normal: Vector3,
+		size: Vector3, new_basis: Basis, edges: Array) -> Vector3:
+	# Determine which axis to skip (the one most aligned with the surface normal)
+	var skip := 0
+	if absf(hit_normal[1]) > absf(hit_normal[skip]): skip = 1
+	if absf(hit_normal[2]) > absf(hit_normal[skip]): skip = 2
+
+	var result := hit_point
+	for axis in 3:
+		if axis == skip:
+			continue
+		var half := (absf(new_basis.x[axis]) * size.x
+				+ absf(new_basis.y[axis]) * size.y
+				+ absf(new_basis.z[axis]) * size.z) * 0.5
+		var best      := result[axis]
+		var best_dist := SNAP_THRESHOLD
+		for edge: float in edges[axis]:
+			for candidate: float in [edge + half, edge - half]:
+				var d := absf(result[axis] - candidate)
+				if d < best_dist:
+					best_dist = d
+					best = candidate
+		result[axis] = best
+	return result
 
 
 # --- Symmetry / reflection ---

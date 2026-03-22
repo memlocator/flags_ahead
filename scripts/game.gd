@@ -58,10 +58,11 @@ func _update_hud() -> void:
 		if build_system.selected_piece != &"" else "—"
 	var count: int  = build_system.placed_pieces.size()
 	var sym         := "ON" if build_system.symmetry_enabled else "OFF"
+	var snap        := "ON" if build_system.snapping_enabled else "OFF"
 	const AXIS_NAMES := ["X (red)", "Y (green)", "Z (blue)"]
 	var axis_label: String = AXIS_NAMES[build_system.rot_axis_index] if build_system.selected_piece != &"" else "—"
-	hud_label.text  = "Piece: %s  |  [R] Axis: %s  |  [T] Reset rot  |  [M] Sym: %s  |  Placed: %d\nWASD=move  LMB=place  RMB=remove  Scroll=spin  Shift=fine  TAB/1-9=select  Esc=cursor" \
-		% [piece_label, axis_label, sym, count]
+	hud_label.text  = "Piece: %s  |  [R] Axis: %s  |  [T] Reset rot  |  [G] Snap: %s  |  [M] Sym: %s  |  Placed: %d\nWASD=move  LMB=place  RMB=remove  Scroll=spin  Shift=fine  TAB/1-9=select  Esc=cursor" \
+		% [piece_label, axis_label, snap, sym, count]
 
 
 func _on_piece_placed(_piece: ShipPiece) -> void:

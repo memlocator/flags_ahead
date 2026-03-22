@@ -22,6 +22,7 @@ var stability := StabilitySystem.new()
 
 # Symmetry — reflects placements across a plane defined by origin + normal
 var symmetry_enabled: bool = false
+var snapping_enabled: bool = true
 var symmetry_origin: Vector3 = Vector3.ZERO
 var symmetry_normal: Vector3 = Vector3(0, 0, 1)  # Z=0 plane (ship centerline)
 
@@ -141,9 +142,6 @@ func _physics_process(delta: float) -> void:
 	var fa: int         = def.get("face_axis", 2)
 	var h_out           := BuildUtils.half_out(sz, fa)
 
-	if absf(hit_normal.y) < 0.9:
-		hit_point = BuildUtils.snap_vertical(hit_point, sz, _collect_edge_ys())
-
 	_current_normal = hit_normal
 
 	# Compute base orientation; slerp smooth spin toward target
@@ -151,6 +149,10 @@ func _physics_process(delta: float) -> void:
 	var target_rot   := Basis(base.z, _target_rots[2]) * Basis(base.y, _target_rots[1]) * Basis(base.x, _target_rots[0])
 	_smooth_spin_rot  = _smooth_spin_rot.slerp(target_rot, minf(delta * rotation_smooth, 1.0))
 	var spin_rot     := _smooth_spin_rot
+
+	# Snap along surface-tangent axes using the piece's world-space extents
+	if snapping_enabled:
+		hit_point = BuildUtils.snap_to_edges(hit_point, hit_normal, sz, spin_rot * base, _collect_edges())
 
 	# Active axis indicator direction (whichever axis is currently selected)
 	var spin_local := Vector3.RIGHT if rot_axis_index == 0 else (Vector3.UP if rot_axis_index == 1 else Vector3.BACK)
@@ -205,6 +207,9 @@ func _input(event: InputEvent) -> void:
 				_target_rots[0] = 0.0; _target_rots[1] = 0.0; _target_rots[2] = 0.0
 				_smooth_spin_rot = Basis.IDENTITY
 				_smooth_mirror_spin_rot = Basis.IDENTITY
+				return
+			KEY_G:
+				snapping_enabled = not snapping_enabled
 				return
 			KEY_M:
 				symmetry_enabled = not symmetry_enabled
@@ -286,20 +291,22 @@ func _remove_piece_at_cursor() -> void:
 		stability.compute(placed_pieces)
 
 
-func _collect_edge_ys() -> Array[float]:
-	var edges: Array[float] = []
+func _collect_edges() -> Array:
+	var edges: Array = [[], [], []]
 
 	var keel_group := ship_root.get_node_or_null("KeelGroup") as Node3D
 	if keel_group:
 		for child: Node in keel_group.get_children():
 			if child is StaticBody3D:
-				edges.append_array(BuildUtils.body_edge_ys(child as StaticBody3D))
+				for axis in 3:
+					edges[axis].append_array(BuildUtils.body_edges_on_axis(child as StaticBody3D, axis))
 
 	for piece: ShipPiece in placed_pieces:
-		var sz: Vector3 = PieceDefs.DEFS[piece.piece_type].size
+		var psz: Vector3 = PieceDefs.DEFS[piece.piece_type].size
 		var b := piece.global_basis
-		var half_y := absf(b.x.y) * sz.x * 0.5 + absf(b.y.y) * sz.y * 0.5 + absf(b.z.y) * sz.z * 0.5
-		edges.append(piece.global_position.y + half_y)
-		edges.append(piece.global_position.y - half_y)
+		for axis in 3:
+			var half := absf(b.x[axis]) * psz.x * 0.5 + absf(b.y[axis]) * psz.y * 0.5 + absf(b.z[axis]) * psz.z * 0.5
+			edges[axis].append(piece.global_position[axis] + half)
+			edges[axis].append(piece.global_position[axis] - half)
 
 	return edges
