@@ -11,7 +11,7 @@ extends Node3D
 @export var rotation_step_deg: float = 15.0
 
 var selected_piece: StringName = &"plank"
-var piece_rot: float = 0.0
+var piece_rots: Array[float] = [0.0, 0.0, 0.0]
 var rot_axis_index: int = 0
 
 var placed_pieces: Array[ShipPiece] = []
@@ -35,6 +35,8 @@ var _piece_index: int = 0
 var _last_normal: Vector3 = Vector3.ZERO
 var _ghost_valid: bool = false
 var _ghost_world_center: Vector3 = Vector3.ZERO
+var _ghost_mirror_center: Vector3 = Vector3.ZERO
+var _ghost_mirror_basis: Basis = Basis.IDENTITY
 var _current_normal: Vector3 = Vector3.UP
 var _ghost_pivot_mirror: Node3D
 var _ghost_mesh_node_mirror: Node3D
@@ -126,7 +128,9 @@ func _physics_process(_delta: float) -> void:
 	var hit_normal: Vector3 = result.normal
 
 	if hit_normal.dot(_last_normal) < 0.99:
-		piece_rot = 0.0
+		piece_rots[0] = 0.0
+		piece_rots[1] = 0.0
+		piece_rots[2] = 0.0
 		_last_normal = hit_normal
 
 	var def: Dictionary = PieceDefs.DEFS[selected_piece]
@@ -139,11 +143,13 @@ func _physics_process(_delta: float) -> void:
 
 	_current_normal = hit_normal
 
-	# Compute base orientation and world-space spin axis
-	var base       := BuildUtils.surface_base(hit_normal, fa)
+	# Compute base orientation and combined spin rotation (all three axes)
+	var base     := BuildUtils.surface_base(hit_normal, fa)
+	var spin_rot := Basis(base.z, piece_rots[2]) * Basis(base.y, piece_rots[1]) * Basis(base.x, piece_rots[0])
+
+	# Active axis indicator direction (whichever axis is currently selected)
 	var spin_local := Vector3.RIGHT if rot_axis_index == 0 else (Vector3.UP if rot_axis_index == 1 else Vector3.BACK)
 	var spin_world := (base * spin_local).normalized()
-	var spin_rot   := Basis(spin_world, piece_rot)
 
 	# Primary ghost — piece rotates around pivot (hit_point)
 	ghost_pivot.global_position = hit_point
@@ -154,7 +160,7 @@ func _physics_process(_delta: float) -> void:
 	_ghost_valid                = true
 	_ghost_world_center         = hit_point + ghost_mesh_node.position
 
-	# Axis indicator — at pivot, oriented along spin_world
+	# Axis indicator — at pivot, oriented along active spin_world
 	if _axis_indicator:
 		_axis_indicator.visible = true
 		_axis_indicator.position = Vector3.ZERO
@@ -170,12 +176,13 @@ func _physics_process(_delta: float) -> void:
 		var m_hit    := BuildUtils.reflect_point(hit_point, symmetry_origin, symmetry_normal)
 		var m_normal := BuildUtils.reflect_dir(hit_normal, symmetry_normal)
 		var m_base   := BuildUtils.surface_base(m_normal, fa)
-		var m_spin_w := BuildUtils.reflect_dir(spin_world, symmetry_normal).normalized()
-		var m_rot    := Basis(m_spin_w, -piece_rot)
+		var m_rot    := Basis(m_base.z, -piece_rots[2]) * Basis(m_base.y, -piece_rots[1]) * Basis(m_base.x, -piece_rots[0])
 		_ghost_pivot_mirror.global_position = m_hit
 		_ghost_pivot_mirror.rotation        = Vector3.ZERO
 		_ghost_mesh_node_mirror.position    = m_rot * (m_normal * h_out)
 		_ghost_mesh_node_mirror.basis       = m_rot * m_base
+		_ghost_mirror_center                = m_hit + _ghost_mesh_node_mirror.position
+		_ghost_mirror_basis                 = _ghost_mesh_node_mirror.basis
 		_ghost_pivot_mirror.visible         = true
 	else:
 		_ghost_pivot_mirror.visible = false
@@ -186,7 +193,11 @@ func _input(event: InputEvent) -> void:
 		match event.keycode:
 			KEY_R:
 				rot_axis_index = (rot_axis_index + 1) % 3
-				piece_rot = 0.0
+				return
+			KEY_T:
+				piece_rots[0] = 0.0
+				piece_rots[1] = 0.0
+				piece_rots[2] = 0.0
 				return
 			KEY_M:
 				symmetry_enabled = not symmetry_enabled
@@ -215,12 +226,12 @@ func _input(event: InputEvent) -> void:
 			MOUSE_BUTTON_WHEEL_UP:
 				if selected_piece != &"":
 					var step := deg_to_rad(rotation_step_deg * (0.5 if Input.is_key_pressed(KEY_SHIFT) else 1.0))
-					piece_rot += step
+					piece_rots[rot_axis_index] += step
 					get_viewport().set_input_as_handled()
 			MOUSE_BUTTON_WHEEL_DOWN:
 				if selected_piece != &"":
 					var step := deg_to_rad(rotation_step_deg * (0.5 if Input.is_key_pressed(KEY_SHIFT) else 1.0))
-					piece_rot -= step
+					piece_rots[rot_axis_index] -= step
 					get_viewport().set_input_as_handled()
 
 
@@ -228,10 +239,7 @@ func _place_piece() -> void:
 	var piece := _spawn_piece(selected_piece, _ghost_world_center, ghost_mesh_node.basis)
 
 	if symmetry_enabled:
-		var fa: int = PieceDefs.DEFS[selected_piece].get("face_axis", 2)
-		var m_center := BuildUtils.reflect_point(_ghost_world_center, symmetry_origin, symmetry_normal)
-		var m_normal := BuildUtils.reflect_dir(_current_normal, symmetry_normal)
-		_spawn_piece(selected_piece, m_center, BuildUtils.surface_basis(m_normal, fa, -piece_rot, rot_axis_index))
+		_spawn_piece(selected_piece, _ghost_mirror_center, _ghost_mirror_basis)
 
 	stability.compute(placed_pieces)
 	emit_signal("piece_placed", piece)
