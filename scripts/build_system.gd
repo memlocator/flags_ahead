@@ -222,9 +222,9 @@ func _physics_process(delta: float) -> void:
 			and result.collider.collision_layer & 1 != 0
 			and absf(hit_normal.y) < 0.7)
 	if want_bent:
-		var skel_node := BuildUtils.find_ancestor(result.collider, ShipSkeleton)
-		var skel_origin_y := skel_node.global_position.y if skel_node else 0.0
-		var hit_y_local := hit_point.y - skel_origin_y
+		var skel_node: Node3D = BuildUtils.find_ancestor(result.collider, ShipSkeleton) as Node3D
+		var skel_origin_y: float = skel_node.global_position.y if skel_node else 0.0
+		var hit_y_local: float = hit_point.y - skel_origin_y
 		if absf(hit_y_local - _last_bend_hit_y) > 0.05:
 			_last_bend_hit_y = hit_y_local
 			_current_bend_offsets = _hull_curve.get_bend_offsets(hit_y_local, sz.x)
