@@ -3,6 +3,7 @@ class_name PieceMeshBuilder
 
 # Materials (created once, reused)
 static var _wood_mat: StandardMaterial3D
+static var _hull_mat: StandardMaterial3D  # double-sided for hull panels
 static var _iron_mat: StandardMaterial3D
 static var _glass_mat: StandardMaterial3D
 static var _ghost_mat: StandardMaterial3D
@@ -12,6 +13,10 @@ static func _ensure_materials() -> void:
 		return
 	_wood_mat = StandardMaterial3D.new()
 	_wood_mat.albedo_color = Color(0.55, 0.35, 0.15)
+
+	_hull_mat = StandardMaterial3D.new()
+	_hull_mat.albedo_color = Color(0.50, 0.30, 0.12)
+	_hull_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 
 	_iron_mat = StandardMaterial3D.new()
 	_iron_mat.albedo_color = Color(0.4, 0.4, 0.45)
@@ -67,6 +72,8 @@ static func build_ghost(type: StringName) -> Node3D:
 	var root := Node3D.new()
 
 	match type:
+		&"skeleton":
+			_build_skeleton_ghost(root)
 		&"window_wall":
 			_build_window(root, sz, _ghost_mat)
 		&"mast":
@@ -76,6 +83,25 @@ static func build_ghost(type: StringName) -> Node3D:
 		_:
 			root.add_child(_box_mi(sz, Vector3.ZERO, _ghost_mat))
 	return root
+
+
+static func _build_skeleton_ghost(root: Node3D) -> void:
+	var cfg := ShipConfig.new()
+	var cy  := PieceDefs.DEFS[&"skeleton"].size.y * 0.5
+	var keel_len := absf(cfg.bow_x - cfg.stern_x)
+	var mid_x    := (cfg.bow_x + cfg.stern_x) * 0.5
+	root.add_child(_box_mi(Vector3(keel_len, 0.3, 0.3), Vector3(mid_x, 0.15 - cy, 0.0), _ghost_mat))
+	var last_x := cfg.rib_x_positions[cfg.rib_x_positions.size() - 1]
+	var bow_h  := cfg.rib_height(last_x)
+	root.add_child(_box_mi(Vector3(0.25, bow_h, 0.25), Vector3(cfg.bow_x - 0.05, bow_h * 0.5 - cy, 0.0), _ghost_mat))
+	var first_x  := cfg.rib_x_positions[0]
+	var stern_h  := cfg.rib_height(first_x)
+	var stern_hw := cfg.rib_half_width(first_x) * 0.88 * 2.0
+	root.add_child(_box_mi(Vector3(0.2, stern_h, stern_hw), Vector3(cfg.stern_x, stern_h * 0.5 - cy, 0.0), _ghost_mat))
+	for xf: float in cfg.rib_x_positions:
+		var h  := cfg.rib_height(xf)
+		var hw := cfg.rib_half_width(xf)
+		root.add_child(_box_mi(Vector3(0.12, h, hw * 2.0), Vector3(xf, h * 0.5 - cy, 0.0), _ghost_mat))
 
 
 static func _build_window(root: Node3D, _sz: Vector3, mat: Material) -> void:
@@ -183,6 +209,49 @@ static func _bent_convex(sz: Vector3, offsets: PackedFloat32Array) -> ConvexPoly
 		pts.append(Vector3(x, yo + hy, -hz))
 		pts.append(Vector3(x, yo - hy,  hz))
 		pts.append(Vector3(x, yo - hy, -hz))
+	var shape := ConvexPolygonShape3D.new()
+	shape.points = pts
+	return shape
+
+
+# ── Hull panel builders ───────────────────────────────────────────────────────
+
+## pts_a, pts_b: PackedVector3Array in piece local space, matching HULL_PROFILE size.
+## Lofts a quad strip between the two rib profiles with inner+outer faces.
+static func build_hull_panel(pts_a: PackedVector3Array, pts_b: PackedVector3Array) -> Node3D:
+	_ensure_materials()
+	var root := Node3D.new()
+	root.add_child(_hull_panel_mesh(pts_a, pts_b, _hull_mat))
+	var cs := CollisionShape3D.new()
+	cs.shape = _hull_panel_convex(pts_a, pts_b)
+	root.add_child(cs)
+	return root
+
+
+static func build_hull_panel_ghost(pts_a: PackedVector3Array, pts_b: PackedVector3Array) -> Node3D:
+	_ensure_materials()
+	var root := Node3D.new()
+	root.add_child(_hull_panel_mesh(pts_a, pts_b, _ghost_mat))
+	return root
+
+
+static func _hull_panel_mesh(pts_a: PackedVector3Array, pts_b: PackedVector3Array, mat: Material) -> MeshInstance3D:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var n := pts_a.size()
+	for i in range(n - 1):
+		_st_quad(st, pts_a[i], pts_b[i], pts_a[i + 1], pts_b[i + 1])
+	st.generate_normals()
+	var mi := MeshInstance3D.new()
+	mi.mesh = st.commit()
+	mi.material_override = mat
+	return mi
+
+
+static func _hull_panel_convex(pts_a: PackedVector3Array, pts_b: PackedVector3Array) -> ConvexPolygonShape3D:
+	var pts := PackedVector3Array()
+	for p: Vector3 in pts_a: pts.append(p)
+	for p: Vector3 in pts_b: pts.append(p)
 	var shape := ConvexPolygonShape3D.new()
 	shape.points = pts
 	return shape

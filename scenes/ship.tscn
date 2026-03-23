@@ -1,0 +1,12 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/ship_skeleton.gd" id="1_skel"]
+[ext_resource type="Resource" path="res://assets/ships/sloop.tres" id="2_cfg"]
+
+[node name="Ship" type="Node3D"]
+
+[node name="Skeleton" type="Node3D" parent="." unique_name_in_owner=true]
+script = ExtResource("1_skel")
+config = ExtResource("2_cfg")
+
+[node name="PlacedPieces" type="Node3D" parent="." unique_name_in_owner=true]

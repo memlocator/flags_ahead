@@ -25,15 +25,16 @@ func _init() -> void:
 	collision_mask = 0
 
 
-func setup(type: StringName) -> void:
+func setup(type: StringName, add_collision: bool = true) -> void:
 	piece_type = type
 	var def: Dictionary = PieceDefs.DEFS[type]
 	hp = float(def.hp)
-	var cs := CollisionShape3D.new()
-	var shape := BoxShape3D.new()
-	shape.size = def.size
-	cs.shape = shape
-	add_child(cs)
+	if add_collision:
+		var cs := CollisionShape3D.new()
+		var shape := BoxShape3D.new()
+		shape.size = def.size
+		cs.shape = shape
+		add_child(cs)
 
 
 # --- Lifecycle hooks (override in subclass or attached script) ---

@@ -7,6 +7,7 @@ extends Node3D
 @onready var keel_group          := $ShipRoot/KeelGroup as Node3D
 @onready var placed_pieces_node  := $ShipRoot/PlacedPieces as Node3D
 @onready var build_system        := $BuildSystem
+@onready var skeletons_root      := $SkeletonsRoot as Node3D
 @onready var ghost_pivot         := $BuildSystem/BuildPreview/PivotNode as Node3D
 @onready var ghost_mesh_node     := $BuildSystem/BuildPreview/PivotNode/GhostMesh as Node3D
 @onready var toolbar             := $Toolbar
@@ -14,8 +15,6 @@ extends Node3D
 
 
 func _ready() -> void:
-	keel_group.build()
-
 	camera_pivot.target       = player
 	camera_pivot.build_system = build_system
 
@@ -26,6 +25,7 @@ func _ready() -> void:
 	build_system.placed_pieces_node  = placed_pieces_node
 	build_system.ghost_pivot         = ghost_pivot
 	build_system.ghost_mesh_node     = ghost_mesh_node
+	build_system.skeletons_root      = skeletons_root
 
 	toolbar.build_system = build_system
 

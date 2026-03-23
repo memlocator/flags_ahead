@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="ShipConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ship_config.gd" id="1_config"]
+
+[resource]
+script = ExtResource("1_config")
+rib_x_positions = PackedFloat32Array(-6, -4, -2, 0, 2, 4, 6)
+bow_x = 7.5
+stern_x = -7.5
+rib_height_base = 6.5
+rib_height_taper = 0.15
+rib_width_base = 3.6
+rib_width_taper = 0.12
+hull_profile = [Vector2(0, 0), Vector2(0.06, 0.32), Vector2(0.22, 0.72), Vector2(0.42, 0.99), Vector2(0.60, 0.97), Vector2(0.78, 0.92), Vector2(1, 0.87)]
+deck_heights = [2.0, 3.8, 5.5]

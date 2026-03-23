@@ -16,6 +16,10 @@ config/features=PackedStringArray("4.6", "Forward Plus")
 config/icon="res://icon.svg"
 config/run/main_scene="res://scenes/game.tscn"
 
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/ship_builder/plugin.cfg")
+
 [physics]
 
 3d/physics_engine="Jolt Physics"

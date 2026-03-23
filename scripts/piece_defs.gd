@@ -1,6 +1,22 @@
 class_name PieceDefs
 
 const DEFS: Dictionary = {
+	&"hull_panel": {
+		"label": "Hull Panel",
+		"size": Vector3(2.0, 2.5, 2.2),  # approximate — real shape is procedural
+		"face_axis": 2,
+		"weight": 1.5,
+		"material_tier": 0,
+		"hp": 120,
+	},
+	&"skeleton": {
+		"label": "Ship Frame",
+		"size": Vector3(10.4, 4.5, 4.8),
+		"face_axis": 1,  # Y — sits flat on ground
+		"weight": 0.0,
+		"material_tier": 0,
+		"hp": 9999,
+	},
 	&"plank": {
 		"label": "Wood Plank",
 		"size": Vector3(2.0, 0.5, 0.12),
