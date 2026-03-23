@@ -323,8 +323,9 @@ func _process(delta: float) -> void:
 	var to_collapse: Array[ShipPiece] = []
 	for piece: ShipPiece in placed_pieces:
 		if piece.is_warning():
-			var drain := float(PieceDefs.DEFS[piece.piece_type].hp) / 10.0
-			piece.drain_hp(drain * delta)
+			var max_hp := float(PieceDefs.DEFS[piece.piece_type].hp)
+			var t := maxf(1.5, 10.0 * piece.support / StructuralGraph.COLLAPSE_THRESHOLD)
+			piece.drain_hp(max_hp / t * delta)
 			if piece.hp <= 0.0:
 				to_collapse.append(piece)
 	for piece: ShipPiece in to_collapse:

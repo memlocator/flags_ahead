@@ -29,8 +29,8 @@ func _ready() -> void:
 
 	toolbar.build_system = build_system
 
-	build_system.piece_placed.connect(_on_piece_placed)
-	build_system.piece_removed.connect(_on_piece_removed)
+	build_system.piece_added.connect(_on_piece_added)
+	build_system.piece_destroyed.connect(_on_piece_destroyed)
 
 	_add_crosshair()
 	_update_hud()
@@ -66,9 +66,9 @@ func _update_hud() -> void:
 		% [piece_label, axis_label, snap, sym, count]
 
 
-func _on_piece_placed(_piece: ShipPiece) -> void:
+func _on_piece_added(_piece: ShipPiece, _reason: BuildSystem.PlaceReason, _source: Node) -> void:
 	pass
 
 
-func _on_piece_removed(_piece: ShipPiece) -> void:
+func _on_piece_destroyed(_piece: ShipPiece, _reason: BuildSystem.RemoveReason, _source: Node) -> void:
 	pass

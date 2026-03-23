@@ -26,7 +26,6 @@ var _distance: float = 8.0
 var _target_distance: float = 8.0
 
 @onready var _spring: SpringArm3D = $SpringArm3D
-@onready var _cam: Camera3D = $SpringArm3D/Camera3D
 
 
 func _ready() -> void:
