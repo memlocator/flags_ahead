@@ -19,7 +19,6 @@ var rot_axis_index: int = 0
 
 var placed_pieces: Array[ShipPiece] = []
 var graph := StructuralGraph.new()
-var _support_view: bool = false
 
 # Symmetry — reflects placements across a plane defined by origin + normal
 var symmetry_enabled: bool = false
@@ -27,8 +26,16 @@ var snapping_enabled: bool = true
 var symmetry_origin: Vector3 = Vector3.ZERO
 var symmetry_normal: Vector3 = Vector3(0, 0, 1)  # Z=0 plane (ship centerline)
 
-signal piece_placed(piece: ShipPiece)
-signal piece_removed(piece: ShipPiece)
+enum PlaceReason  { PLAYER, MIRROR, LOADED }
+enum RemoveReason { PLAYER, INSTABILITY, CLEARED }
+
+signal piece_added(piece: ShipPiece, reason: PlaceReason, source: Node)
+signal piece_destroyed(piece: ShipPiece, reason: RemoveReason, source: Node)
+signal structure_changed()
+signal piece_selected(type: StringName)
+signal piece_deselected()
+signal symmetry_changed(enabled: bool)
+signal snapping_changed(enabled: bool)
 
 const PIECE_CYCLE: Array = [
 	&"plank", &"iron_plank", &"deck", &"wall",
@@ -92,8 +99,7 @@ func select_piece(type: StringName) -> void:
 	selected_piece = type
 	if type == &"":
 		if was_placing:
-			_support_view = false
-			graph.apply_default_colors(placed_pieces)
+			emit_signal("piece_deselected")
 		return
 	if type != prev_piece:
 		var dr: Array = PieceDefs.DEFS[type].get("default_rots", [0.0, 0.0, 0.0])
@@ -102,9 +108,7 @@ func select_piece(type: StringName) -> void:
 		_smooth_mirror_spin_rot = Basis.IDENTITY
 	_piece_index = PIECE_CYCLE.find(type)
 	_rebuild_ghost()
-	if not _support_view:
-		_support_view = true
-		graph.apply_support_colors(placed_pieces)
+	emit_signal("piece_selected", type)
 
 
 func _physics_process(delta: float) -> void:
@@ -153,9 +157,11 @@ func _physics_process(delta: float) -> void:
 	_smooth_spin_rot  = _smooth_spin_rot.slerp(target_rot, minf(delta * rotation_smooth, 1.0))
 	var spin_rot     := _smooth_spin_rot
 
-	# Snap along surface-tangent axes using the piece's world-space extents
+	# Snap ghost snap points to nearest snap point on any placed piece
 	if snapping_enabled:
-		hit_point = BuildUtils.snap_to_edges(hit_point, hit_normal, sz, spin_rot * base, _collect_edges())
+		var ghost_center := hit_point + spin_rot * (hit_normal * h_out)
+		var snap_delta := BuildUtils.snap_to_points(ghost_center, spin_rot * base, sz, placed_pieces)
+		hit_point += snap_delta
 
 	# Active axis indicator direction (whichever axis is currently selected)
 	var spin_world: Vector3
@@ -218,10 +224,12 @@ func _input(event: InputEvent) -> void:
 				return
 			KEY_G:
 				snapping_enabled = not snapping_enabled
+				emit_signal("snapping_changed", snapping_enabled)
 				return
 			KEY_M:
 				symmetry_enabled = not symmetry_enabled
 				_ghost_pivot_mirror.visible = false
+				emit_signal("symmetry_changed", symmetry_enabled)
 				return
 			KEY_TAB:
 				_piece_index = (_piece_index + 1) % PIECE_CYCLE.size()
@@ -259,14 +267,17 @@ func _place_piece() -> void:
 	var space := get_world_3d().direct_space_state
 	var piece := _spawn_piece(selected_piece, _ghost_world_center, ghost_mesh_node.basis)
 	graph.add_piece(piece, space)
+	graph.update_collapse_states(placed_pieces)
+	emit_signal("piece_added", piece, PlaceReason.PLAYER, null)
 
 	if symmetry_enabled:
 		var mirror := _spawn_piece(selected_piece, _ghost_mirror_center, _ghost_mirror_basis)
 		graph.add_piece(mirror, space)
+		graph.update_collapse_states(placed_pieces)
+		emit_signal("piece_added", mirror, PlaceReason.MIRROR, null)
 
-	if _support_view:
-		graph.apply_support_colors(placed_pieces)
-	emit_signal("piece_placed", piece)
+	graph.apply_support_colors(placed_pieces)
+	emit_signal("structure_changed")
 
 
 func _spawn_piece(type: StringName, pos: Vector3, piece_basis: Basis) -> ShipPiece:
@@ -297,30 +308,65 @@ func _remove_piece_at_cursor() -> void:
 		node = node.get_parent()
 
 	if node is ShipPiece:
-		placed_pieces.erase(node)
-		graph.remove_piece(node as ShipPiece)
-		emit_signal("piece_removed", node as ShipPiece)
-		node.queue_free()
-		if _support_view:
-			graph.apply_support_colors(placed_pieces)
+		var piece := node as ShipPiece
+		piece.stop_warning()
+		placed_pieces.erase(piece)
+		graph.remove_piece(piece)
+		graph.update_collapse_states(placed_pieces)
+		emit_signal("piece_destroyed", piece, RemoveReason.PLAYER, null)
+		emit_signal("structure_changed")
+		piece.queue_free()
+		graph.apply_support_colors(placed_pieces)
 
 
-func _collect_edges() -> Array:
-	var edges: Array = [[], [], []]
-
-	var keel_group := ship_root.get_node_or_null("KeelGroup") as Node3D
-	if keel_group:
-		for child: Node in keel_group.get_children():
-			if child is StaticBody3D:
-				for axis in 3:
-					edges[axis].append_array(BuildUtils.body_edges_on_axis(child as StaticBody3D, axis))
-
+func _process(delta: float) -> void:
+	var to_collapse: Array[ShipPiece] = []
 	for piece: ShipPiece in placed_pieces:
-		var psz: Vector3 = PieceDefs.DEFS[piece.piece_type].size
-		var b := piece.global_basis
-		for axis in 3:
-			var half := absf(b.x[axis]) * psz.x * 0.5 + absf(b.y[axis]) * psz.y * 0.5 + absf(b.z[axis]) * psz.z * 0.5
-			edges[axis].append(piece.global_position[axis] + half)
-			edges[axis].append(piece.global_position[axis] - half)
+		if piece.is_warning():
+			var drain := float(PieceDefs.DEFS[piece.piece_type].hp) / 10.0
+			piece.drain_hp(drain * delta)
+			if piece.hp <= 0.0:
+				to_collapse.append(piece)
+	for piece: ShipPiece in to_collapse:
+		_do_collapse(piece)
 
-	return edges
+
+func _do_collapse(piece: ShipPiece) -> void:
+	var pos := piece.global_position
+	piece.collapse()
+	placed_pieces.erase(piece)
+	graph.remove_piece(piece)
+	graph.update_collapse_states(placed_pieces)
+	emit_signal("piece_destroyed", piece, RemoveReason.INSTABILITY, null)
+	emit_signal("structure_changed")
+	piece.queue_free()
+	_spawn_collapse_effect(pos)
+	graph.apply_support_colors(placed_pieces)
+
+
+func _spawn_collapse_effect(pos: Vector3) -> void:
+	var p := GPUParticles3D.new()
+	p.amount = 40
+	p.lifetime = 1.5
+	p.one_shot = true
+	p.explosiveness = 0.85
+	p.emitting = true
+	var mat := ParticleProcessMaterial.new()
+	mat.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
+	mat.emission_sphere_radius = 0.4
+	mat.direction = Vector3(0.0, 1.0, 0.0)
+	mat.spread = 180.0
+	mat.initial_velocity_min = 2.0
+	mat.initial_velocity_max = 7.0
+	mat.gravity = Vector3(0.0, -9.8, 0.0)
+	mat.color = Color(0.55, 0.45, 0.30, 1.0)
+	p.process_material = mat
+	var mesh := SphereMesh.new()
+	mesh.radius = 0.05
+	mesh.height = 0.10
+	p.draw_pass_1 = mesh
+	add_child(p)
+	p.global_position = pos
+	get_tree().create_timer(p.lifetime * 1.5).timeout.connect(p.queue_free)
+
+

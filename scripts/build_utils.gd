@@ -25,48 +25,44 @@ static func surface_base(normal: Vector3, face_axis: int) -> Basis:
 
 # --- Snapping ---
 
-const SNAP_THRESHOLD := 0.22
+const SNAP_THRESHOLD := 0.55
 
-# Collect edges of a StaticBody3D (BoxShape3D child) along a world axis (0=X,1=Y,2=Z).
-static func body_edges_on_axis(body: StaticBody3D, axis: int) -> Array[float]:
-	var edges: Array[float] = []
-	for child: Node in body.get_children():
-		if child is CollisionShape3D and child.shape is BoxShape3D:
-			var sz  := (child.shape as BoxShape3D).size
-			var b   := body.global_basis
-			var half := absf(b.x[axis]) * sz.x * 0.5 + absf(b.y[axis]) * sz.y * 0.5 + absf(b.z[axis]) * sz.z * 0.5
-			edges.append(body.global_position[axis] + half)
-			edges.append(body.global_position[axis] - half)
-			break
-	return edges
-
-
-# Snap hit_point along the two surface-tangent axes (skip the axis most aligned
-# with hit_normal). Uses the new piece's world-space basis for correct extents.
-static func snap_to_edges(hit_point: Vector3, hit_normal: Vector3,
-		size: Vector3, new_basis: Basis, edges: Array) -> Vector3:
-	# Determine which axis to skip (the one most aligned with the surface normal)
-	var skip := 0
-	if absf(hit_normal[1]) > absf(hit_normal[skip]): skip = 1
-	if absf(hit_normal[2]) > absf(hit_normal[skip]): skip = 2
-
-	var result := hit_point
-	for axis in 3:
-		if axis == skip:
-			continue
-		var half := (absf(new_basis.x[axis]) * size.x
-				+ absf(new_basis.y[axis]) * size.y
-				+ absf(new_basis.z[axis]) * size.z) * 0.5
-		var best      := result[axis]
-		var best_dist := SNAP_THRESHOLD
-		for edge: float in edges[axis]:
-			for candidate: float in [edge + half, edge - half]:
-				var d := absf(result[axis] - candidate)
+# Returns the world-space delta to add to ghost_center to snap it to the nearest
+# matching snap point on any placed piece. Returns Vector3.ZERO if nothing is
+# within SNAP_THRESHOLD.
+static func snap_to_points(ghost_center: Vector3, ghost_basis: Basis,
+		ghost_size: Vector3, pieces: Array) -> Vector3:
+	var ghost_pts := _snap_points(ghost_center, ghost_basis, ghost_size)
+	var best_dist := SNAP_THRESHOLD
+	var best_delta := Vector3.ZERO
+	for piece: ShipPiece in pieces:
+		var psz: Vector3 = PieceDefs.DEFS[piece.piece_type].size
+		var piece_pts := _snap_points(piece.global_position, piece.global_basis, psz)
+		for gp: Vector3 in ghost_pts:
+			for pp: Vector3 in piece_pts:
+				var d := gp.distance_to(pp)
 				if d < best_dist:
 					best_dist = d
-					best = candidate
-		result[axis] = best
-	return result
+					best_delta = pp - gp
+	return best_delta
+
+
+# 14 snap points: 8 corners + 6 face centres.
+static func _snap_points(center: Vector3, basis: Basis, size: Vector3) -> Array[Vector3]:
+	var hx := basis.x * (size.x * 0.5)
+	var hy := basis.y * (size.y * 0.5)
+	var hz := basis.z * (size.z * 0.5)
+	return [
+		# corners
+		center + hx + hy + hz, center + hx + hy - hz,
+		center + hx - hy + hz, center + hx - hy - hz,
+		center - hx + hy + hz, center - hx + hy - hz,
+		center - hx - hy + hz, center - hx - hy - hz,
+		# face centres
+		center + hx, center - hx,
+		center + hy, center - hy,
+		center + hz, center - hz,
+	]
 
 
 # --- Symmetry / reflection ---

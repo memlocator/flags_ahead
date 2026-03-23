@@ -22,6 +22,7 @@ const TIER_DEFAULT_COLORS: Array[Color] = [
 	Color(0.40, 0.40, 0.45),  # iron
 ]
 
+const COLLAPSE_THRESHOLD := 0.1
 const ADJACENCY_MARGIN := 0.12
 
 var _nodes: Dictionary = {}  # piece_id -> ShipPiece
@@ -130,7 +131,21 @@ func _are_adjacent(a: ShipPiece, b: ShipPiece) -> bool:
 	return true
 
 
+func update_collapse_states(pieces: Array) -> void:
+	for piece: ShipPiece in pieces:
+		if piece.support < COLLAPSE_THRESHOLD:
+			piece.start_warning()
+			_tint_piece(piece, Color.BLACK)
+		else:
+			if piece.is_warning():
+				piece.stop_warning()
+				var tier: int = PieceDefs.DEFS[piece.piece_type].get("material_tier", 0)
+				_tint_piece(piece, TIER_DEFAULT_COLORS[tier])
+
+
 func _support_color(support: float) -> Color:
+	if support < COLLAPSE_THRESHOLD:
+		return Color.BLACK
 	for entry: Array in SUPPORT_COLORS:
 		if support >= float(entry[0]):
 			return entry[1]
