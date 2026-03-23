@@ -68,8 +68,8 @@ const HULL_PIECE_TYPES: Array = [&"plank", &"iron_plank"]
 var _hull_panel_pts_a: PackedVector3Array
 var _hull_panel_pts_b: PackedVector3Array
 var _hull_panel_skel: ShipSkeleton
-var _hull_panel_bay_a: float = INF
-var _hull_panel_bay_b: float = INF
+var _hull_panel_bay_a: float = 9999.0
+var _hull_panel_bay_b: float = 9999.0
 var _hull_panel_bay_side: float = 0.0
 var _hull_panel_stations: Array[float] = []
 
@@ -136,8 +136,8 @@ func select_piece(type: StringName) -> void:
 	_current_bend_offsets = PackedFloat32Array()
 	_last_bend_hit_y = -999.0
 	_hull_panel_skel = null
-	_hull_panel_bay_a = INF
-	_hull_panel_bay_b = INF
+	_hull_panel_bay_a = 9999.0
+	_hull_panel_bay_b = 9999.0
 	_hull_panel_bay_side = 0.0
 	_hull_panel_stations = []
 	_rebuild_ghost()

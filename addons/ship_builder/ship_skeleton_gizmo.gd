@@ -22,7 +22,9 @@ func _redraw(gizmo: EditorNode3DGizmo) -> void:
 	gizmo.clear()
 
 	var skel: ShipSkeleton = gizmo.get_node_3d() as ShipSkeleton
-	var cfg: ShipConfig    = skel._get_config()
+	if not skel or not skel.get_script():
+		return
+	var cfg: ShipConfig = skel._get_config()
 
 	var hull_lines: PackedVector3Array      = PackedVector3Array()
 	var silhouette_lines: PackedVector3Array = PackedVector3Array()
