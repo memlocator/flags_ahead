@@ -13,12 +13,24 @@ extends Node3D
 @onready var toolbar             := $Toolbar
 @onready var hud_label           := $HUD/Label as Label
 
+var _ship_editor: ShipEditor
+
 
 func _ready() -> void:
 	camera_pivot.target       = player
 	camera_pivot.build_system = build_system
 
 	player.camera = camera
+
+	# Set up the runtime hull editor
+	_ship_editor = ShipEditor.new()
+	_ship_editor.player       = player
+	_ship_editor.camera       = camera
+	_ship_editor.camera_pivot = camera_pivot
+	add_child(_ship_editor)
+
+	# Wire up any interactables already in the scene
+	_connect_interactables()
 
 	build_system.build_camera        = camera
 	build_system.ship_root           = ship_root
@@ -72,3 +84,31 @@ func _on_piece_added(_piece: ShipPiece, _reason: BuildSystem.PlaceReason, _sourc
 
 func _on_piece_destroyed(_piece: ShipPiece, _reason: BuildSystem.RemoveReason, _source: Node) -> void:
 	pass
+
+
+# ── Ship editor wiring ────────────────────────────────────────────────────────
+
+func _connect_interactables() -> void:
+	# Walk the tree and connect any ShipSkeletonInteractable nodes
+	for node in get_tree().get_nodes_in_group("ship_skeleton_interactable"):
+		_connect_interactable(node)
+	# Also scan skeletons_root for interactable children
+	if skeletons_root:
+		for child in skeletons_root.get_children():
+			for sub in child.get_children():
+				if sub is ShipSkeletonInteractable:
+					_connect_interactable(sub)
+
+
+func _connect_interactable(interactable: ShipSkeletonInteractable) -> void:
+	if not interactable.interact_requested.is_connected(_on_interact_requested):
+		interactable.interact_requested.connect(_on_interact_requested.bind(interactable))
+		print("ShipEditor: connected interactable ", interactable.get_path())
+
+
+func _on_interact_requested(skeleton: ShipSkeleton, interactable: ShipSkeletonInteractable) -> void:
+	interactable.set_editing(true)
+	_ship_editor.editing_finished.connect(
+		func(_confirmed: bool) -> void: interactable.set_editing(false),
+		CONNECT_ONE_SHOT)
+	_ship_editor.start_editing(skeleton)

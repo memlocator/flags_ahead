@@ -25,6 +25,18 @@ var _mouse_captured: bool = true
 var _distance: float = 8.0
 var _target_distance: float = 8.0
 
+var _edit_mode: bool = false
+var _edit_target: Node3D = null
+var _right_drag: bool = false
+
+
+func set_edit_mode(on: bool, target: Node3D = null) -> void:
+	_edit_mode   = on
+	_edit_target = target
+	_right_drag  = false
+	if on:
+		_mouse_captured = false
+
 @onready var _spring: SpringArm3D = $SpringArm3D
 
 
@@ -42,6 +54,21 @@ func _input(event: InputEvent) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _edit_mode:
+		# In edit mode: right-drag to orbit, scroll to zoom, no capture
+		if event is InputEventMouseButton:
+			var mb := event as InputEventMouseButton
+			if mb.button_index == MOUSE_BUTTON_RIGHT:
+				_right_drag = mb.pressed
+			elif mb.button_index == MOUSE_BUTTON_WHEEL_UP:
+				_target_distance = clampf(_target_distance - zoom_step, min_distance, max_distance)
+			elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+				_target_distance = clampf(_target_distance + zoom_step, min_distance, max_distance)
+		if event is InputEventMouseMotion and _right_drag:
+			_yaw   -= (event as InputEventMouseMotion).relative.x * sensitivity
+			_pitch  = clampf(_pitch - (event as InputEventMouseMotion).relative.y * sensitivity, -75.0, 70.0)
+		return
+
 	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
 		_mouse_captured = false
 		return
@@ -60,15 +87,17 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _process(delta: float) -> void:
-	var want := Input.MOUSE_MODE_CAPTURED if _mouse_captured else Input.MOUSE_MODE_VISIBLE
-	if Input.mouse_mode != want:
-		Input.mouse_mode = want
+	if not _edit_mode:
+		var want := Input.MOUSE_MODE_CAPTURED if _mouse_captured else Input.MOUSE_MODE_VISIBLE
+		if Input.mouse_mode != want:
+			Input.mouse_mode = want
 	_distance = lerpf(_distance, _target_distance, clampf(delta * 12.0, 0.0, 1.0))
 	_update_pivot()
 
 
 func _update_pivot() -> void:
-	var origin: Vector3 = (target.global_position if target else Vector3.ZERO) + Vector3.UP * pivot_height
+	var use_target := _edit_target if (_edit_mode and _edit_target) else target
+	var origin: Vector3 = (use_target.global_position if use_target else Vector3.ZERO) + Vector3.UP * pivot_height
 	global_position = origin
 	rotation_order = EULER_ORDER_YXZ
 	rotation.y = deg_to_rad(_yaw)
