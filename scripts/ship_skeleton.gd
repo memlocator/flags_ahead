@@ -9,6 +9,7 @@ const RIB_COLOR      := Color(0.35, 0.22, 0.09)
 const KEEL_COLOR     := Color(0.25, 0.15, 0.06)
 const BOW_COLOR      := Color(0.28, 0.18, 0.07)
 const GIRDER_COLOR   := Color(0.30, 0.18, 0.07)
+const SHEER_COLOR    := Color(0.32, 0.20, 0.08)
 
 static var _mats: Dictionary = {}
 
@@ -16,12 +17,47 @@ static var _mats: Dictionary = {}
 # If left empty a default config is created at runtime.
 @export var config: ShipConfig:
 	set(value):
+		if config and config.changed.is_connected(_rebuild):
+			config.changed.disconnect(_rebuild)
 		config = value
+		if config:
+			config.changed.connect(_rebuild)
 		if is_inside_tree():
 			_rebuild()
 
 
+func _get_property_list() -> Array[Dictionary]:
+	var props: Array[Dictionary] = []
+	if not config:
+		return props
+	props.append({
+		"name": "Hull Config", "type": TYPE_NIL,
+		"usage": PROPERTY_USAGE_GROUP, "hint_string": ""
+	})
+	for p in config.get_property_list():
+		if p["usage"] & PROPERTY_USAGE_EDITOR:
+			props.append(p)
+	return props
+
+
+func _get(property: StringName) -> Variant:
+	if config:
+		var val = config.get(property)
+		if val != null:
+			return val
+	return null
+
+
+func _set(property: StringName, value: Variant) -> bool:
+	if config and config.get(property) != null:
+		config.set(property, value)
+		return true
+	return false
+
+
 func _ready() -> void:
+	if config and not config.changed.is_connected(_rebuild):
+		config.changed.connect(_rebuild)
 	_rebuild()
 
 
@@ -46,6 +82,9 @@ func build() -> void:
 	_add_bow(cfg)
 	_add_stern(cfg)
 	_add_deck_girders(cfg)
+	_add_sheer_rails(cfg)
+	_add_bow_stringers(cfg)
+	_add_stern_stringers(cfg)
 
 
 # ── Keel / bow / stern ────────────────────────────────────────────────────────
@@ -72,14 +111,30 @@ func _add_keel(cfg: ShipConfig) -> void:
 func _add_bow(cfg: ShipConfig) -> void:
 	var last_rib_x := cfg.rib_x_positions[cfg.rib_x_positions.size() - 1]
 	var bow_h      := cfg.rib_height(last_rib_x)
-	_make_box(Vector3(0.25, bow_h, 0.25), Vector3(cfg.bow_x - 0.05, bow_h * 0.5, 0), 12.0, BOW_COLOR)
+	_add_post_curve(cfg.bow_x, bow_h, cfg.bow_rake)
 
 
 func _add_stern(cfg: ShipConfig) -> void:
 	var first_rib_x := cfg.rib_x_positions[0]
 	var stern_h     := cfg.rib_height(first_rib_x)
-	var stern_hw    := cfg.rib_half_width(first_rib_x) * 0.88 * 2.0
-	_make_box(Vector3(0.2, stern_h, stern_hw), Vector3(cfg.stern_x, stern_h * 0.5, 0), 0.0, BOW_COLOR)
+	_add_post_curve(cfg.stern_x, stern_h, cfg.stern_rake)
+
+
+## Builds a curved post (stem or sternpost) in the XY plane from keel to gunwale.
+## rake > 0 leans the top forward (+X); rake < 0 leans it aft (−X).
+func _add_post_curve(base_x: float, height: float, rake: float) -> void:
+	var n    := 6
+	var prev := Vector2(base_x, 0.0)
+	for i in range(1, n + 1):
+		var t   := float(i) / n
+		var cur := Vector2(base_x + rake * t, height * t)
+		var dx  := cur.x - prev.x
+		var dy  := cur.y - prev.y
+		var seg_len := sqrt(dx * dx + dy * dy)
+		var rot_z   := rad_to_deg(atan2(-dx, dy))
+		var mid     := Vector3((prev.x + cur.x) * 0.5, (prev.y + cur.y) * 0.5, 0.0)
+		_make_box(Vector3(RIB_THICKNESS * 1.5, seg_len, RIB_THICKNESS * 1.5), mid, rot_z, BOW_COLOR)
+		prev = cur
 
 
 # ── Curved ribs ───────────────────────────────────────────────────────────────
@@ -130,6 +185,57 @@ func _add_deck_girders(cfg: ShipConfig) -> void:
 			var beam_hw := cfg.rib_half_width(rib_x) * cfg.hull_z_at(t) * 0.88
 			_make_box(Vector3(RIB_THICKNESS, RIB_THICKNESS, beam_hw * 2.0),
 					Vector3(rib_x, deck_y, 0.0), 0.0, GIRDER_COLOR)
+
+
+# ── Bow / stern stringers (profile points → post at same height) ──────────────
+
+func _add_bow_stringers(cfg: ShipConfig) -> void:
+	var last_x := cfg.rib_x_positions[cfg.rib_x_positions.size() - 1]
+	var h      := cfg.rib_height(last_x)
+	var hw     := cfg.rib_half_width(last_x)
+	for p: Vector2 in cfg.hull_profile:
+		var t    := p.x  # normalised height (0 = keel, 1 = gunwale)
+		var stem := Vector3(cfg.bow_x + cfg.bow_rake * t, t * h, 0.0)
+		for side in [-1.0, 1.0]:
+			_add_rail_seg(Vector3(last_x, t * h, side * p.y * hw), stem)
+
+
+func _add_stern_stringers(cfg: ShipConfig) -> void:
+	var first_x := cfg.rib_x_positions[0]
+	var h       := cfg.rib_height(first_x)
+	var hw      := cfg.rib_half_width(first_x)
+	for p: Vector2 in cfg.hull_profile:
+		var t    := p.x
+		var post := Vector3(cfg.stern_x + cfg.stern_rake * t, t * h, 0.0)
+		for side in [-1.0, 1.0]:
+			_add_rail_seg(Vector3(first_x, t * h, side * p.y * hw), post)
+
+
+# ── Sheer rails (longitudinal gunwale beams along rib tops) ──────────────────
+
+func _add_sheer_rails(cfg: ShipConfig) -> void:
+	var N := cfg.rib_x_positions.size()
+	for side in [-1.0, 1.0]:
+		for i in range(N - 1):
+			var x1  := cfg.rib_x_positions[i]
+			var x2  := cfg.rib_x_positions[i + 1]
+			var A   := Vector3(x1, cfg.rib_height(x1), side * cfg.rib_half_width(x1))
+			var B   := Vector3(x2, cfg.rib_height(x2), side * cfg.rib_half_width(x2))
+			_add_rail_seg(A, B)
+
+
+func _add_rail_seg(A: Vector3, B: Vector3) -> void:
+	var dir     := (B - A)
+	var seg_len := dir.length()
+	if seg_len < 0.001:
+		return
+	var body := StaticBody3D.new()
+	body.collision_layer = LAYER_SKELETON
+	body.collision_mask  = 0
+	body.position = (A + B) * 0.5
+	body.quaternion = Quaternion(Vector3.UP, dir / seg_len)
+	_attach_box(body, Vector3(RIB_THICKNESS, seg_len, RIB_THICKNESS), SHEER_COLOR)
+	add_child(body)
 
 
 # ── Shared helpers ────────────────────────────────────────────────────────────

@@ -5,11 +5,33 @@ extends Resource
 ## Defines the structural parameters of a ship frame.
 ## Create different ship types as .tres files and assign to a ShipSkeleton.
 
+# Number of ribs — changing this evenly respaces them between stern and bow.
+@export_range(2, 20) var rib_count: int = 5:
+	set(v):
+		rib_count = v
+		if rib_x_positions.size() != v:
+			_respace_ribs()
+			emit_changed()
+
+# Number of decks — changing this evenly respaces them between keel and gunwale.
+@export_range(0, 10) var deck_count: int = 2:
+	set(v):
+		deck_count = v
+		if deck_heights.size() != v:
+			_respace_decks()
+			emit_changed()
+
 # Rib X positions along the ship's long axis (bow is positive X)
 @export var rib_x_positions: PackedFloat32Array = PackedFloat32Array([-4.0, -2.0, 0.0, 2.0, 4.0])
 
 # Where the bow stem sits (should be beyond the last positive rib)
 @export var bow_x: float = 5.1
+
+# How far the bow stem rakes forward from keel to gunwale (0 = vertical stem)
+@export_range(0.0, 3.0, 0.05) var bow_rake: float = 0.0
+
+# How far the sternpost rakes aft from keel to gunwale (negative = rakes aft)
+@export_range(-2.0, 0.5, 0.05) var stern_rake: float = 0.0
 
 # Where the transom stern sits (should be beyond the last negative rib)
 @export var stern_x: float = -5.0
@@ -76,12 +98,14 @@ func rib_profile_points(rib_x: float, side: float) -> PackedVector3Array:
 	return pts
 
 
-## Bow cap: all profile points converge toward the centreline at bow_x.
-func bow_stem_points() -> PackedVector3Array:
+## Bow cap: profile points converge toward bow_x.
+## With bow_radius > 0 the upper points fan out to a rounded face instead of a sharp stem.
+## Points along the bow stem curve (centerline). side param unused — stem is on Z=0.
+func bow_stem_points(_side: float = 1.0) -> PackedVector3Array:
 	var h   := rib_height(rib_x_positions[rib_x_positions.size() - 1])
 	var pts := PackedVector3Array()
 	for p: Vector2 in hull_profile:
-		pts.append(Vector3(bow_x, p.x * h, 0.0))
+		pts.append(Vector3(bow_x + bow_rake * p.x, p.x * h, 0.0))
 	return pts
 
 
@@ -97,6 +121,21 @@ func stern_profile_points(side: float) -> PackedVector3Array:
 	for p: Vector2 in hull_profile:
 		pts.append(Vector3(stern_x, p.x * h, side * p.y * hw))
 	return pts
+
+
+func _respace_ribs() -> void:
+	if stern_x >= bow_x or rib_count < 2:
+		return
+	var step := (bow_x - stern_x) / float(rib_count + 1)
+	rib_x_positions.resize(rib_count)
+	for i in rib_count:
+		rib_x_positions[i] = stern_x + step * float(i + 1)
+
+
+func _respace_decks() -> void:
+	deck_heights.resize(deck_count)
+	for i in deck_count:
+		deck_heights[i] = rib_height_base * float(i + 1) / float(deck_count + 1)
 
 
 ## Z fraction of the hull profile at a given normalised height t (0=keel, 1=gunwale).

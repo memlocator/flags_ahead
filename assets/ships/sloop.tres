@@ -4,12 +4,16 @@
 
 [resource]
 script = ExtResource("1_config")
-rib_x_positions = PackedFloat32Array(-4, -2, 0, 2, 4)
-bow_x = 5.1
-stern_x = -5.0
-rib_height_base = 4.5
-rib_height_taper = 0.18
-rib_width_base = 2.4
-rib_width_taper = 0.10
-hull_profile = [Vector2(0, 0), Vector2(0.08, 0.38), Vector2(0.25, 0.78), Vector2(0.45, 0.98), Vector2(0.62, 0.96), Vector2(0.8, 0.91), Vector2(1, 0.88)]
-deck_heights = [2.0, 3.5]
+rib_count = 7
+deck_count = 2
+rib_x_positions = PackedFloat32Array(-4.5, -3.0, -1.5, 0.0, 1.5, 3.0, 4.5)
+bow_x = 5.8
+stern_x = -5.5
+bow_rake = 0.9
+stern_rake = -0.25
+rib_height_base = 4.2
+rib_height_taper = 0.03
+rib_width_base = 3.2
+rib_width_taper = 0.06
+hull_profile = [Vector2(0, 0), Vector2(0.06, 0.30), Vector2(0.18, 0.78), Vector2(0.38, 1.00), Vector2(0.60, 0.99), Vector2(0.80, 0.97), Vector2(1.00, 0.95)]
+deck_heights = [1.8, 3.4]

@@ -12,3 +12,5 @@ func _enter_tree() -> void:
 func _exit_tree() -> void:
 	remove_node_3d_gizmo_plugin(_gizmo_plugin)
 	_gizmo_plugin = null
+
+
