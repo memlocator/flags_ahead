@@ -8,7 +8,6 @@ extends Resource
 # Number of ribs — changing this evenly respaces them between stern and bow.
 @export_range(2, 20) var rib_count: int = 5:
 	set(v):
-		rib_count = v
 		if rib_x_positions.size() != v:
 			_respace_ribs()
 			emit_changed()
@@ -116,6 +115,16 @@ func stern_profile_points(_side: float = 1.0) -> PackedVector3Array:
 	var pts := PackedVector3Array()
 	for p: Vector2 in hull_profile:
 		pts.append(Vector3(stern_x + stern_rake * p.x, p.x * h, 0.0))
+	return pts
+
+
+## Deck profile at a given station X and deck height Y — two points spanning port to starboard.
+func deck_profile_points(station_x: float, deck_y: float) -> PackedVector3Array:
+	var t  := deck_y / maxf(rib_height(station_x), 0.001)
+	var hw := rib_half_width(station_x) * hull_z_at(t)
+	var pts := PackedVector3Array()
+	pts.append(Vector3(station_x, deck_y, -hw))
+	pts.append(Vector3(station_x, deck_y,  hw))
 	return pts
 
 

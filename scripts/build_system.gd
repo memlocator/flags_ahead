@@ -39,7 +39,7 @@ signal symmetry_changed(enabled: bool)
 signal snapping_changed(enabled: bool)
 
 const PIECE_CYCLE: Array = [
-	&"hull_panel", &"skeleton",
+	&"hull_panel", &"deck_panel", &"skeleton",
 	&"plank", &"iron_plank", &"deck", &"wall",
 	&"half_wall", &"window_wall", &"beam", &"mast", &"cannon",
 	&"foundation", &"post", &"floor_board", &"roof_panel", &"door_frame", &"stair",
@@ -72,6 +72,15 @@ var _hull_panel_bay_a: float = 9999.0
 var _hull_panel_bay_b: float = 9999.0
 var _hull_panel_bay_side: float = 0.0
 var _hull_panel_stations: Array[float] = []
+
+# Deck panel state
+var _deck_panel_pts_a: PackedVector3Array
+var _deck_panel_pts_b: PackedVector3Array
+var _deck_panel_skel: ShipSkeleton
+var _deck_panel_bay_a: float = 9999.0
+var _deck_panel_bay_b: float = 9999.0
+var _deck_panel_deck_y: float = 9999.0
+var _deck_panel_stations: Array[float] = []
 
 
 func _ready() -> void:
@@ -140,6 +149,11 @@ func select_piece(type: StringName) -> void:
 	_hull_panel_bay_b = 9999.0
 	_hull_panel_bay_side = 0.0
 	_hull_panel_stations = []
+	_deck_panel_skel = null
+	_deck_panel_bay_a = 9999.0
+	_deck_panel_bay_b = 9999.0
+	_deck_panel_deck_y = 9999.0
+	_deck_panel_stations = []
 	_rebuild_ghost()
 	emit_signal("piece_selected", type)
 
@@ -171,6 +185,10 @@ func _physics_process(delta: float) -> void:
 
 	if selected_piece == &"hull_panel":
 		_process_hull_panel(result)
+		return
+
+	if selected_piece == &"deck_panel":
+		_process_deck_panel(result)
 		return
 
 	var hit_point: Vector3 = result.position
@@ -323,6 +341,9 @@ func _place_piece() -> void:
 	if selected_piece == &"hull_panel":
 		_place_hull_panel()
 		return
+	if selected_piece == &"deck_panel":
+		_place_deck_panel()
+		return
 	if selected_piece == &"skeleton":
 		_place_skeleton()
 		return
@@ -425,6 +446,102 @@ func _place_hull_panel() -> void:
 	placed_pieces_node.add_child(piece)
 	piece.global_position = _hull_panel_skel.global_position
 	piece.basis           = _hull_panel_skel.basis
+	placed_pieces.append(piece)
+	var space := get_world_3d().direct_space_state
+	graph.add_piece(piece, space)
+	graph.update_collapse_states(placed_pieces)
+	graph.apply_support_colors(placed_pieces)
+	emit_signal("piece_added", piece, PlaceReason.PLAYER, null)
+	emit_signal("structure_changed")
+
+
+func _process_deck_panel(result: Dictionary) -> void:
+	if not (result.collider.collision_layer & 1):
+		ghost_pivot.visible = false
+		_ghost_valid = false
+		if _axis_indicator: _axis_indicator.visible = false
+		return
+
+	var skel := BuildUtils.find_ancestor(result.collider, ShipSkeleton) as ShipSkeleton
+	if not skel:
+		ghost_pivot.visible = false
+		_ghost_valid = false
+		if _axis_indicator: _axis_indicator.visible = false
+		return
+
+	var hit_local := skel.to_local(result.position)
+
+	if skel != _deck_panel_skel or _deck_panel_stations.is_empty():
+		_deck_panel_stations = skel._get_config().bay_stations()
+
+	# Snap to the nearest deck height
+	var cfg: ShipConfig = skel._get_config()
+	var deck_y := cfg.deck_heights[0]
+	for h: float in cfg.deck_heights:
+		if absf(h - hit_local.y) < absf(deck_y - hit_local.y):
+			deck_y = h
+
+	# Find which bay the cursor is in
+	var stations := _deck_panel_stations
+	var bay_a    := stations[0]
+	var bay_b    := stations[1]
+	for i in range(stations.size() - 1):
+		if hit_local.x >= minf(stations[i], stations[i + 1]) \
+				and hit_local.x <= maxf(stations[i], stations[i + 1]):
+			bay_a = stations[i]
+			bay_b = stations[i + 1]
+			break
+
+	if bay_a != _deck_panel_bay_a or bay_b != _deck_panel_bay_b \
+			or deck_y != _deck_panel_deck_y or skel != _deck_panel_skel:
+		_deck_panel_bay_a   = bay_a
+		_deck_panel_bay_b   = bay_b
+		_deck_panel_deck_y  = deck_y
+		_deck_panel_skel    = skel
+		_deck_panel_pts_a   = _bay_deck_profile(cfg, bay_a, deck_y)
+		_deck_panel_pts_b   = _bay_deck_profile(cfg, bay_b, deck_y)
+		_clear_node_children(ghost_mesh_node)
+		ghost_mesh_node.add_child(
+			PieceMeshBuilder.build_hull_panel_ghost(_deck_panel_pts_a, _deck_panel_pts_b)
+		)
+
+	ghost_pivot.global_position = skel.global_position
+	ghost_pivot.basis           = skel.basis
+	ghost_pivot.visible         = true
+	ghost_mesh_node.position    = Vector3.ZERO
+	ghost_mesh_node.basis       = Basis.IDENTITY
+	_ghost_valid                = true
+	_ghost_world_center         = skel.global_position
+	_ghost_pivot_mirror.visible = false
+	if _axis_indicator: _axis_indicator.visible = false
+
+
+func _bay_deck_profile(cfg: ShipConfig, station_x: float, deck_y: float) -> PackedVector3Array:
+	if is_equal_approx(station_x, cfg.bow_x):
+		var h  := cfg.rib_height(cfg.rib_x_positions[-1])
+		var t  := deck_y / maxf(h, 0.001)
+		var pt := Vector3(cfg.bow_x + cfg.bow_rake * t, deck_y, 0.0)
+		return PackedVector3Array([pt, pt])
+	if is_equal_approx(station_x, cfg.stern_x):
+		var h  := cfg.rib_height(cfg.rib_x_positions[0])
+		var t  := deck_y / maxf(h, 0.001)
+		var pt := Vector3(cfg.stern_x + cfg.stern_rake * t, deck_y, 0.0)
+		return PackedVector3Array([pt, pt])
+	return cfg.deck_profile_points(station_x, deck_y)
+
+
+func _place_deck_panel() -> void:
+	if not _deck_panel_skel or _deck_panel_pts_a.is_empty():
+		return
+	var piece := ShipPiece.new()
+	piece.setup(&"deck_panel", false)
+	piece.add_child(PieceMeshBuilder.build_hull_panel(_deck_panel_pts_a, _deck_panel_pts_b))
+	var cs := CollisionShape3D.new()
+	cs.shape = PieceMeshBuilder.hull_panel_convex(_deck_panel_pts_a, _deck_panel_pts_b)
+	piece.add_child(cs)
+	placed_pieces_node.add_child(piece)
+	piece.global_position = _deck_panel_skel.global_position
+	piece.basis           = _deck_panel_skel.basis
 	placed_pieces.append(piece)
 	var space := get_world_3d().direct_space_state
 	graph.add_piece(piece, space)

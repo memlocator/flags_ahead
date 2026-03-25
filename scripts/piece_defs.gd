@@ -9,6 +9,14 @@ const DEFS: Dictionary = {
 		"material_tier": 0,
 		"hp": 120,
 	},
+	&"deck_panel": {
+		"label": "Deck Panel",
+		"size": Vector3(2.0, 0.1, 2.0),  # approximate — real shape is procedural
+		"face_axis": 1,
+		"weight": 1.0,
+		"material_tier": 0,
+		"hp": 100,
+	},
 	&"skeleton": {
 		"label": "Ship Frame",
 		"size": Vector3(10.4, 4.5, 4.8),
