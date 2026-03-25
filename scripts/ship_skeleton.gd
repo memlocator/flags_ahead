@@ -178,13 +178,22 @@ func _make_rib_seg(pos: Vector3, seg_len: float, rot_x: float) -> StaticBody3D:
 func _add_deck_girders(cfg: ShipConfig) -> void:
 	for deck_y: float in cfg.deck_heights:
 		for rib_x: float in cfg.rib_x_positions:
-			var h := cfg.rib_height(rib_x)
-			if deck_y >= h:
+			if deck_y >= cfg.rib_height(rib_x):
 				continue
-			var t       := clampf(deck_y / h, 0.0, 1.0)
-			var beam_hw := cfg.rib_half_width(rib_x) * cfg.hull_z_at(t) * 0.88
+			var beam_hw := _rib_z_at_y(cfg, rib_x, deck_y)
 			_make_box(Vector3(RIB_THICKNESS, RIB_THICKNESS, beam_hw * 2.0),
 					Vector3(rib_x, deck_y, 0.0), 0.0, GIRDER_COLOR)
+
+
+## Interpolate the Z half-width of the hull at world Y = y on rib at rib_x,
+## by walking the rib_profile_points the same way the rib mesh is built.
+func _rib_z_at_y(cfg: ShipConfig, rib_x: float, y: float) -> float:
+	var pts := cfg.rib_profile_points(rib_x, 1.0)
+	for i in range(pts.size() - 1):
+		if y >= pts[i].y and y <= pts[i + 1].y:
+			var f := (y - pts[i].y) / maxf(pts[i + 1].y - pts[i].y, 0.0001)
+			return lerpf(pts[i].z, pts[i + 1].z, f)
+	return pts[-1].z if not pts.is_empty() else 0.0
 
 
 # ── Bow / stern stringers (profile points → post at same height) ──────────────
@@ -192,23 +201,23 @@ func _add_deck_girders(cfg: ShipConfig) -> void:
 func _add_bow_stringers(cfg: ShipConfig) -> void:
 	var last_x := cfg.rib_x_positions[cfg.rib_x_positions.size() - 1]
 	var h      := cfg.rib_height(last_x)
-	var hw     := cfg.rib_half_width(last_x)
-	for p: Vector2 in cfg.hull_profile:
-		var t    := p.x  # normalised height (0 = keel, 1 = gunwale)
-		var stem := Vector3(cfg.bow_x + cfg.bow_rake * t, t * h, 0.0)
-		for side in [-1.0, 1.0]:
-			_add_rail_seg(Vector3(last_x, t * h, side * p.y * hw), stem)
+	for side in [-1.0, 1.0]:
+		var pts := cfg.rib_profile_points(last_x, side)
+		for i in range(pts.size()):
+			var t    := cfg.hull_profile[i].x
+			var stem := Vector3(cfg.bow_x + cfg.bow_rake * t, t * h, 0.0)
+			_add_rail_seg(pts[i], stem)
 
 
 func _add_stern_stringers(cfg: ShipConfig) -> void:
 	var first_x := cfg.rib_x_positions[0]
 	var h       := cfg.rib_height(first_x)
-	var hw      := cfg.rib_half_width(first_x)
-	for p: Vector2 in cfg.hull_profile:
-		var t    := p.x
-		var post := Vector3(cfg.stern_x + cfg.stern_rake * t, t * h, 0.0)
-		for side in [-1.0, 1.0]:
-			_add_rail_seg(Vector3(first_x, t * h, side * p.y * hw), post)
+	for side in [-1.0, 1.0]:
+		var pts := cfg.rib_profile_points(first_x, side)
+		for i in range(pts.size()):
+			var t    := cfg.hull_profile[i].x
+			var post := Vector3(cfg.stern_x + cfg.stern_rake * t, t * h, 0.0)
+			_add_rail_seg(pts[i], post)
 
 
 # ── Sheer rails (longitudinal gunwale beams along rib tops) ──────────────────
@@ -219,8 +228,8 @@ func _add_sheer_rails(cfg: ShipConfig) -> void:
 		for i in range(N - 1):
 			var x1  := cfg.rib_x_positions[i]
 			var x2  := cfg.rib_x_positions[i + 1]
-			var A   := Vector3(x1, cfg.rib_height(x1), side * cfg.rib_half_width(x1))
-			var B   := Vector3(x2, cfg.rib_height(x2), side * cfg.rib_half_width(x2))
+			var A   := cfg.rib_profile_points(x1, side)[-1]
+			var B   := cfg.rib_profile_points(x2, side)[-1]
 			_add_rail_seg(A, B)
 
 

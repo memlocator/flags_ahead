@@ -1,0 +1,125 @@
+<h2>Hull Editor — What should be draggable?</h2>
+<p class="subtitle">Each handle type gives you different control over the ship shape. Which do you want?</p>
+
+<style>
+.ship-diagram { background: #0d1117; border-radius: 8px; padding: 20px; margin: 12px 0; position: relative; overflow: hidden; }
+.ship-diagram svg { display: block; margin: 0 auto; }
+.handle { fill: #f0c040; stroke: #fff; stroke-width: 1.5; cursor: pointer; }
+.handle-blue { fill: #40a0f0; }
+.handle-green { fill: #40f080; }
+.handle-red { fill: #f06040; }
+.gizmo-line { stroke: #4ab8ff; stroke-width: 1.5; fill: none; opacity: 0.7; }
+.gizmo-keel { stroke: #f0e040; stroke-width: 2; }
+.gizmo-deck { stroke: #40f080; stroke-width: 1.5; stroke-dasharray: 4 3; opacity: 0.6; }
+.label-tag { font: 11px monospace; fill: #aaa; }
+.label-handle { font: 11px monospace; fill: #f0c040; }
+.label-blue { fill: #40a0f0; }
+.label-green { fill: #40f080; }
+.label-red { fill: #f06040; }
+.dim { opacity: 0.35; }
+</style>
+
+<div class="options" data-multiselect>
+
+  <div class="option" data-choice="profile" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Hull profile handles</h3>
+      <p>Drag the control points of the cross-section curve — bilge, tumblehome, gunwale. All ribs share one profile shape that scales to fit each rib's height/width.</p>
+      <div class="ship-diagram">
+        <svg width="260" height="160" viewBox="-10 -10 270 170">
+          <!-- rib cross section -->
+          <polyline class="gizmo-line" points="130,10 119,17 107,34 103,60 103,85 108,110 118,130 130,140" />
+          <polyline class="gizmo-line" points="130,10 141,17 153,34 157,60 157,85 152,110 142,130 130,140" />
+          <!-- keel cross -->
+          <line class="gizmo-keel" x1="110" y1="140" x2="150" y2="140" />
+          <!-- handles on profile points -->
+          <circle class="handle" cx="130" cy="10" r="6" />
+          <circle class="handle" cx="119" cy="17" r="5" />
+          <circle class="handle" cx="107" cy="34" r="5" />
+          <circle class="handle" cx="103" cy="60" r="5" />
+          <circle class="handle" cx="103" cy="85" r="5" />
+          <circle class="handle" cx="108" cy="110" r="5" />
+          <circle class="handle" cx="118" cy="130" r="5" />
+          <circle class="handle" cx="130" cy="140" r="5" />
+          <!-- mirror dim -->
+          <circle class="handle dim" cx="141" cy="17" r="5" />
+          <circle class="handle dim" cx="153" cy="34" r="5" />
+          <circle class="handle dim" cx="157" cy="60" r="5" />
+          <text class="label-tag" x="60" y="50">← drag</text>
+          <text class="label-tag" x="60" y="63">these</text>
+          <text class="label-tag" x="160" y="100">mirrored</text>
+          <text class="label-tag" x="155" y="112">(auto)</text>
+          <text class="label-tag" x="55" y="155">front view (one rib)</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="ribs" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Rib position handles</h3>
+      <p>Drag ribs fore/aft along the ship's length. Also move bow and stern endpoints to lengthen or shorten the hull.</p>
+      <div class="ship-diagram">
+        <svg width="260" height="110" viewBox="-10 -10 270 120">
+          <!-- keel line -->
+          <line class="gizmo-keel" x1="10" y1="80" x2="250" y2="80" />
+          <!-- gunwale top line -->
+          <polyline class="gizmo-line" points="10,80 30,20 80,10 130,8 180,10 225,20 250,80" />
+          <!-- rib verticals -->
+          <line class="gizmo-line" x1="55" y1="80" x2="55" y2="14" />
+          <line class="gizmo-line" x1="95" y1="80" x2="95" y2="9" />
+          <line class="gizmo-line" x1="130" y1="80" x2="130" y2="8" />
+          <line class="gizmo-line" x1="165" y1="80" x2="165" y2="9" />
+          <line class="gizmo-line" x1="205" y1="80" x2="205" y2="14" />
+          <!-- rib X handles (drag left/right) -->
+          <rect class="handle handle-blue" x="49" y="77" width="12" height="6" rx="3" />
+          <rect class="handle handle-blue" x="89" y="77" width="12" height="6" rx="3" />
+          <rect class="handle handle-blue" x="124" y="77" width="12" height="6" rx="3" />
+          <rect class="handle handle-blue" x="159" y="77" width="12" height="6" rx="3" />
+          <rect class="handle handle-blue" x="199" y="77" width="12" height="6" rx="3" />
+          <!-- bow/stern endpoints -->
+          <circle class="handle handle-red" cx="10" cy="80" r="6" />
+          <circle class="handle handle-red" cx="250" cy="80" r="6" />
+          <text class="label-blue label-tag" x="48" y="100">ribs (drag ←→)</text>
+          <text class="label-red label-tag" x="2" y="95">stern</text>
+          <text class="label-red label-tag" x="232" y="95">bow</text>
+          <text class="label-tag" x="80" y="112">side view</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="decks" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Deck height handles</h3>
+      <p>Drag the deck level markers up/down to set where each deck sits inside the hull.</p>
+      <div class="ship-diagram">
+        <svg width="260" height="110" viewBox="-10 -10 270 120">
+          <line class="gizmo-keel" x1="10" y1="80" x2="250" y2="80" />
+          <polyline class="gizmo-line" points="10,80 30,20 80,10 130,8 180,10 225,20 250,80" />
+          <line class="gizmo-line" x1="55" y1="80" x2="55" y2="14" />
+          <line class="gizmo-line" x1="95" y1="80" x2="95" y2="9" />
+          <line class="gizmo-line" x1="130" y1="80" x2="130" y2="8" />
+          <line class="gizmo-line" x1="165" y1="80" x2="165" y2="9" />
+          <line class="gizmo-line" x1="205" y1="80" x2="205" y2="14" />
+          <!-- deck lines -->
+          <line class="gizmo-deck" x1="40" y1="45" x2="220" y2="45" />
+          <line class="gizmo-deck" x1="30" y1="60" x2="230" y2="60" />
+          <!-- deck handles on the right edge -->
+          <circle class="handle handle-green" cx="220" cy="45" r="6" />
+          <circle class="handle handle-green" cx="230" cy="60" r="6" />
+          <text class="label-green label-tag" x="228" y="43">↕</text>
+          <text class="label-green label-tag" x="238" y="58">↕</text>
+          <text class="label-tag" x="80" y="98">deck 2</text>
+          <text class="label-tag" x="80" y="112">deck 1</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:16px">Select all that apply — or tell me in the terminal what you're after.</p>
