@@ -418,6 +418,10 @@ func _place_hull_panel() -> void:
 	var piece := ShipPiece.new()
 	piece.setup(&"hull_panel", false)
 	piece.add_child(PieceMeshBuilder.build_hull_panel(_hull_panel_pts_a, _hull_panel_pts_b))
+	# Add collision directly to the StaticBody3D so raycasts on layer 2 block the ghost
+	var cs := CollisionShape3D.new()
+	cs.shape = PieceMeshBuilder.hull_panel_convex(_hull_panel_pts_a, _hull_panel_pts_b)
+	piece.add_child(cs)
 	placed_pieces_node.add_child(piece)
 	piece.global_position = _hull_panel_skel.global_position
 	piece.basis           = _hull_panel_skel.basis

@@ -9,27 +9,30 @@ static var _glass_mat: StandardMaterial3D
 static var _ghost_mat: StandardMaterial3D
 
 static func _ensure_materials() -> void:
-	if _wood_mat:
-		return
-	_wood_mat = StandardMaterial3D.new()
-	_wood_mat.albedo_color = Color(0.55, 0.35, 0.15)
+	if not _wood_mat:
+		_wood_mat = StandardMaterial3D.new()
+		_wood_mat.albedo_color = Color(0.55, 0.35, 0.15)
 
-	_hull_mat = StandardMaterial3D.new()
-	_hull_mat.albedo_color = Color(0.50, 0.30, 0.12)
-	_hull_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	if not _hull_mat:
+		_hull_mat = StandardMaterial3D.new()
+		_hull_mat.albedo_color = Color(0.55, 0.35, 0.15)
+		_hull_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 
-	_iron_mat = StandardMaterial3D.new()
-	_iron_mat.albedo_color = Color(0.4, 0.4, 0.45)
-	_iron_mat.metallic = 0.6
+	if not _iron_mat:
+		_iron_mat = StandardMaterial3D.new()
+		_iron_mat.albedo_color = Color(0.4, 0.4, 0.45)
+		_iron_mat.metallic = 0.6
 
-	_glass_mat = StandardMaterial3D.new()
-	_glass_mat.albedo_color = Color(0.7, 0.85, 1.0, 0.35)
-	_glass_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	if not _glass_mat:
+		_glass_mat = StandardMaterial3D.new()
+		_glass_mat.albedo_color = Color(0.7, 0.85, 1.0, 0.35)
+		_glass_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 
-	_ghost_mat = StandardMaterial3D.new()
-	_ghost_mat.albedo_color = Color(0.4, 0.8, 1.0, 0.45)
-	_ghost_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_ghost_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	if not _ghost_mat:
+		_ghost_mat = StandardMaterial3D.new()
+		_ghost_mat.albedo_color = Color(0.4, 0.8, 1.0, 0.45)
+		_ghost_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_ghost_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 
 
 static func _box_mi(size: Vector3, offset: Vector3, mat: Material) -> MeshInstance3D:
@@ -183,9 +186,9 @@ static func _bent_mesh(sz: Vector3, mat: Material, offsets: PackedFloat32Array) 
 			_st_quad(st, p[6], p[4], p[7], p[5])  # outer cap
 
 	st.generate_normals()
+	st.set_material(mat)
 	var mi := MeshInstance3D.new()
 	mi.mesh = st.commit()
-	mi.material_override = mat
 	return mi
 
 
@@ -222,10 +225,11 @@ static func build_hull_panel(pts_a: PackedVector3Array, pts_b: PackedVector3Arra
 	_ensure_materials()
 	var root := Node3D.new()
 	root.add_child(_hull_panel_mesh(pts_a, pts_b, _hull_mat))
-	var cs := CollisionShape3D.new()
-	cs.shape = _hull_panel_convex(pts_a, pts_b)
-	root.add_child(cs)
 	return root
+
+
+static func hull_panel_convex(pts_a: PackedVector3Array, pts_b: PackedVector3Array) -> ConvexPolygonShape3D:
+	return _hull_panel_convex(pts_a, pts_b)
 
 
 static func build_hull_panel_ghost(pts_a: PackedVector3Array, pts_b: PackedVector3Array) -> Node3D:
@@ -242,9 +246,9 @@ static func _hull_panel_mesh(pts_a: PackedVector3Array, pts_b: PackedVector3Arra
 	for i in range(n - 1):
 		_st_quad(st, pts_a[i], pts_b[i], pts_a[i + 1], pts_b[i + 1])
 	st.generate_normals()
+	st.set_material(mat)
 	var mi := MeshInstance3D.new()
 	mi.mesh = st.commit()
-	mi.material_override = mat
 	return mi
 
 

@@ -4,9 +4,12 @@
 [ext_resource type="Script" uid="uid://bgrn1eympuwrx" path="res://scripts/orbit_camera.gd" id="2_cam"]
 [ext_resource type="Script" uid="uid://dmns4cwcdeg37" path="res://scripts/ship_skeleton.gd" id="3_skel"]
 [ext_resource type="Script" uid="uid://xd4qfkaidmga" path="res://scripts/build_system.gd" id="4_build"]
+[ext_resource type="Script" uid="uid://d2pf8gxhvff7o" path="res://scripts/ship_config.gd" id="5_0tnpc"]
 [ext_resource type="Script" uid="uid://bctc6usitv0m3" path="res://scripts/player_controller.gd" id="5_player"]
 [ext_resource type="Script" uid="uid://btgbwjmbhdf38" path="res://scripts/toolbar.gd" id="6_toolbar"]
 [ext_resource type="PackedScene" uid="uid://clh3bx7tu52ml" path="res://assets/characters/character.glb" id="7_char"]
+[ext_resource type="Script" uid="uid://0301q3mp5tw3" path="res://scripts/ship_skeleton_interactable.gd" id="8_interactable"]
+[ext_resource type="Resource" uid="uid://dfp4woudtokyd" path="res://assets/ships/sloop.tres" id="9_sloop"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_env"]
 
@@ -81,7 +84,15 @@ spring_length = 2.0
 
 [node name="SkeletonsRoot" type="Node3D" parent="." unique_id=298765432]
 
+[node name="Sloop" type="Node3D" parent="SkeletonsRoot" unique_id=112233445]
+script = ExtResource("3_skel")
+config = ExtResource("9_sloop")
+
+[node name="Interactable" type="Node3D" parent="SkeletonsRoot/Sloop" unique_id=112233446]
+script = ExtResource("8_interactable")
+
 [node name="ShipRoot" type="RigidBody3D" parent="." unique_id=614811410]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -23.642042, 0, 0)
 freeze = true
 
 [node name="KeelGroup" type="Node3D" parent="ShipRoot" unique_id=1531864649]

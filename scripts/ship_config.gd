@@ -109,17 +109,13 @@ func bow_stem_points(_side: float = 1.0) -> PackedVector3Array:
 	return pts
 
 
-## Stern profile: matches the last negative rib width but placed at stern_x.
-func stern_profile_points(side: float) -> PackedVector3Array:
-	# Find the rib closest to the stern (smallest X in rib_x_positions)
-	var inner_x := rib_x_positions[0]
-	for x: float in rib_x_positions:
-		if x < inner_x: inner_x = x
-	var h  := rib_height(inner_x)
-	var hw := rib_half_width(inner_x) * 0.88  # transom slightly narrower than hull
+## Stern post points: profile converges to the centreline along the stern post,
+## mirroring how bow_stem_points works for the bow.
+func stern_profile_points(_side: float = 1.0) -> PackedVector3Array:
+	var h   := rib_height(rib_x_positions[0])
 	var pts := PackedVector3Array()
 	for p: Vector2 in hull_profile:
-		pts.append(Vector3(stern_x, p.x * h, side * p.y * hw))
+		pts.append(Vector3(stern_x + stern_rake * p.x, p.x * h, 0.0))
 	return pts
 
 

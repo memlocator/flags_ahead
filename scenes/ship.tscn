@@ -1,12 +1,12 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://bw4ct1w6gpltv"]
 
-[ext_resource type="Script" path="res://scripts/ship_skeleton.gd" id="1_skel"]
-[ext_resource type="Resource" path="res://assets/ships/sloop.tres" id="2_cfg"]
+[ext_resource type="Script" uid="uid://dmns4cwcdeg37" path="res://scripts/ship_skeleton.gd" id="1_2gnfn"]
+[ext_resource type="Resource" uid="uid://dfp4woudtokyd" path="res://assets/ships/sloop.tres" id="2_cfg"]
 
-[node name="Ship" type="Node3D"]
+[node name="Ship" type="Node3D" unique_id=217542598]
 
-[node name="Skeleton" type="Node3D" parent="." unique_name_in_owner=true]
-script = ExtResource("1_skel")
+[node name="Skeleton" type="Node3D" parent="." unique_id=422300704]
+script = ExtResource("1_2gnfn")
 config = ExtResource("2_cfg")
 
-[node name="PlacedPieces" type="Node3D" parent="." unique_name_in_owner=true]
+[node name="PlacedPieces" type="Node3D" parent="." unique_id=1581275856]

@@ -13,6 +13,9 @@ const SHEER_COLOR    := Color(0.32, 0.20, 0.08)
 
 static var _mats: Dictionary = {}
 
+## Set true during live drag to skip physics bodies (avoids Jolt body exhaustion).
+var skip_collision: bool = false
+
 # Assign a ShipConfig .tres to customise the frame.
 # If left empty a default config is created at runtime.
 @export var config: ShipConfig:
@@ -63,8 +66,9 @@ func _ready() -> void:
 
 func _rebuild() -> void:
 	for child in get_children():
-		remove_child(child)
-		child.free()
+		if child.get_meta("built", false):
+			remove_child(child)
+			child.free()
 	build()
 	update_gizmos()
 
@@ -90,13 +94,19 @@ func build() -> void:
 # ── Keel / bow / stern ────────────────────────────────────────────────────────
 
 func _make_box(size: Vector3, pos: Vector3, rot_z_deg: float = 0.0,
-		color: Color = Color(0.3, 0.2, 0.08)) -> StaticBody3D:
-	var body := StaticBody3D.new()
-	body.collision_layer = LAYER_SKELETON
-	body.collision_mask  = 0
+		color: Color = Color(0.3, 0.2, 0.08)) -> Node3D:
+	var body: Node3D
+	if skip_collision:
+		body = Node3D.new()
+	else:
+		var sb := StaticBody3D.new()
+		sb.collision_layer = LAYER_SKELETON
+		sb.collision_mask  = 0
+		body = sb
 	body.position = pos
 	if rot_z_deg != 0.0:
 		body.rotation_degrees.z = rot_z_deg
+	body.set_meta("built", true)
 	_attach_box(body, size, color)
 	add_child(body)
 	return body
@@ -162,12 +172,18 @@ func _add_curved_rib(cfg: ShipConfig, rib_x: float) -> void:
 		_make_rib_seg(Vector3(rib_x, mid_y, -mid_z), seg_len, -rot_x)
 
 
-func _make_rib_seg(pos: Vector3, seg_len: float, rot_x: float) -> StaticBody3D:
-	var body := StaticBody3D.new()
-	body.collision_layer = LAYER_SKELETON
-	body.collision_mask  = 0
+func _make_rib_seg(pos: Vector3, seg_len: float, rot_x: float) -> Node3D:
+	var body: Node3D
+	if skip_collision:
+		body = Node3D.new()
+	else:
+		var sb := StaticBody3D.new()
+		sb.collision_layer = LAYER_SKELETON
+		sb.collision_mask  = 0
+		body = sb
 	body.position   = pos
 	body.rotation.x = rot_x
+	body.set_meta("built", true)
 	_attach_box(body, Vector3(RIB_THICKNESS, seg_len, RIB_THICKNESS), RIB_COLOR)
 	add_child(body)
 	return body
@@ -238,18 +254,25 @@ func _add_rail_seg(A: Vector3, B: Vector3) -> void:
 	var seg_len := dir.length()
 	if seg_len < 0.001:
 		return
-	var body := StaticBody3D.new()
-	body.collision_layer = LAYER_SKELETON
-	body.collision_mask  = 0
+	var body: Node3D
+	if skip_collision:
+		body = Node3D.new()
+	else:
+		var sb := StaticBody3D.new()
+		sb.collision_layer = LAYER_SKELETON
+		sb.collision_mask  = 0
+		body = sb
 	body.position = (A + B) * 0.5
 	body.quaternion = Quaternion(Vector3.UP, dir / seg_len)
+	body.set_meta("built", true)
 	_attach_box(body, Vector3(RIB_THICKNESS, seg_len, RIB_THICKNESS), SHEER_COLOR)
 	add_child(body)
 
 
+
 # ── Shared helpers ────────────────────────────────────────────────────────────
 
-func _attach_box(body: StaticBody3D, size: Vector3, color: Color) -> void:
+func _attach_box(body: Node3D, size: Vector3, color: Color) -> void:
 	if not _mats.has(color):
 		var m := StandardMaterial3D.new()
 		m.albedo_color = color
