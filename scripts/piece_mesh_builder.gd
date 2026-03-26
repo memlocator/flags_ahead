@@ -122,99 +122,10 @@ static func _build_mast(root: Node3D, sz: Vector3, mat: Material) -> void:
 	root.add_child(_box_mi(Vector3(sz.x * 2.5, 0.12, 0.12), Vector3(0, sz.y * 0.35, 0), mat))
 
 
-# ── Bent (hull) mesh ──────────────────────────────────────────────────────────
-
-## Build a bent hull piece (mesh + convex collision).
-## offsets: PackedFloat32Array of (segments+1) Y-displacements in local space.
-static func build_bent_piece(type: StringName, offsets: PackedFloat32Array) -> Node3D:
-	_ensure_materials()
-	var def: Dictionary = PieceDefs.DEFS[type]
-	var mat: Material = _iron_mat if def.get("material_tier", 0) == 2 else _wood_mat
-	var sz: Vector3 = def.size
-	var root := Node3D.new()
-	root.add_child(_bent_mesh(sz, mat, offsets))
-	var cs := CollisionShape3D.new()
-	cs.shape = _bent_convex(sz, offsets)
-	root.add_child(cs)
-	return root
-
-
-## Build a transparent bent ghost (no collision).
-static func build_bent_ghost(type: StringName, offsets: PackedFloat32Array) -> Node3D:
-	_ensure_materials()
-	var sz: Vector3 = PieceDefs.DEFS[type].size
-	var root := Node3D.new()
-	root.add_child(_bent_mesh(sz, _ghost_mat, offsets))
-	return root
-
-
-## Generate a mesh for a plank bent along its local X axis using SurfaceTool
-## (auto-computes correct normals from vertex winding).
-static func _bent_mesh(sz: Vector3, mat: Material, offsets: PackedFloat32Array) -> MeshInstance3D:
-	var segs := offsets.size() - 1
-	var slen := sz.x / float(segs)
-	var hy   := sz.y * 0.5
-	var hz   := sz.z * 0.5
-
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-
-	for i in range(segs):
-		var x0 := float(i)      * slen - sz.x * 0.5
-		var x1 := float(i + 1) * slen - sz.x * 0.5
-		var y0 := offsets[i]
-		var y1 := offsets[i + 1]
-
-		var p: Array = [
-			Vector3(x0, y0 + hy,  hz),  # 0 inner-top-back
-			Vector3(x0, y0 - hy,  hz),  # 1 inner-bot-back
-			Vector3(x0, y0 + hy, -hz),  # 2 inner-top-front
-			Vector3(x0, y0 - hy, -hz),  # 3 inner-bot-front
-			Vector3(x1, y1 + hy,  hz),  # 4 outer-top-back
-			Vector3(x1, y1 - hy,  hz),  # 5 outer-bot-back
-			Vector3(x1, y1 + hy, -hz),  # 6 outer-top-front
-			Vector3(x1, y1 - hy, -hz),  # 7 outer-bot-front
-		]
-
-		_st_quad(st, p[0], p[1], p[4], p[5])  # +Z face
-		_st_quad(st, p[6], p[7], p[2], p[3])  # -Z face
-		_st_quad(st, p[2], p[0], p[6], p[4])  # +Y top
-		_st_quad(st, p[1], p[3], p[5], p[7])  # -Y bottom
-		if i == 0:
-			_st_quad(st, p[0], p[2], p[1], p[3])  # inner cap
-		if i == segs - 1:
-			_st_quad(st, p[6], p[4], p[7], p[5])  # outer cap
-
-	st.generate_normals()
-	st.set_material(mat)
-	var mi := MeshInstance3D.new()
-	mi.mesh = st.commit()
-	return mi
-
-
 static func _st_quad(st: SurfaceTool,
 		a: Vector3, b: Vector3, c: Vector3, d: Vector3) -> void:
 	st.add_vertex(a); st.add_vertex(b); st.add_vertex(c)
 	st.add_vertex(b); st.add_vertex(d); st.add_vertex(c)
-
-
-## Convex hull collision from the bent segment boundary points.
-static func _bent_convex(sz: Vector3, offsets: PackedFloat32Array) -> ConvexPolygonShape3D:
-	var segs := offsets.size() - 1
-	var slen := sz.x / float(segs)
-	var hy   := sz.y * 0.5
-	var hz   := sz.z * 0.5
-	var pts  := PackedVector3Array()
-	for i in range(segs + 1):
-		var x  := float(i) * slen - sz.x * 0.5
-		var yo := offsets[i]
-		pts.append(Vector3(x, yo + hy,  hz))
-		pts.append(Vector3(x, yo + hy, -hz))
-		pts.append(Vector3(x, yo - hy,  hz))
-		pts.append(Vector3(x, yo - hy, -hz))
-	var shape := ConvexPolygonShape3D.new()
-	shape.points = pts
-	return shape
 
 
 # ── Hull panel builders ───────────────────────────────────────────────────────

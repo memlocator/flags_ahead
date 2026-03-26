@@ -22,10 +22,12 @@ func _init() -> void:
 	create_handle_material("h_rib")
 	create_handle_material("h_bowstern")
 	create_handle_material("h_deck")
+	create_handle_material("h_height")
 	_tint("h_profile",  Color(0.95, 0.80, 0.20))
 	_tint("h_rib",      Color(0.25, 0.65, 0.95))
 	_tint("h_bowstern", Color(0.95, 0.35, 0.20))
 	_tint("h_deck",     Color(0.25, 0.95, 0.50))
+	_tint("h_height",   Color(0.95, 0.55, 0.10))
 
 
 func _tint(name: String, color: Color) -> void:
@@ -48,7 +50,7 @@ func _get_handle_count(gizmo: EditorNode3DGizmo) -> int:
 	var cfg := _cfg(gizmo)
 	if not cfg:
 		return 0
-	return cfg.hull_profile.size() + cfg.rib_x_positions.size() + 4 + cfg.deck_heights.size()
+	return cfg.hull_profile.size() + cfg.rib_x_positions.size() + 4 + cfg.deck_heights.size() + 1
 
 
 func _get_handle_name(gizmo: EditorNode3DGizmo, id: int, secondary: bool) -> String:
@@ -61,7 +63,8 @@ func _get_handle_name(gizmo: EditorNode3DGizmo, id: int, secondary: bool) -> Str
 	elif id == P+N+1:    return "Bow"
 	elif id == P+N+2:    return "SternRakeTop"
 	elif id == P+N+3:    return "BowRakeTop"
-	else:                return "Deck[%d]" % (id - P - N - 4)
+	elif id < P + N + 4 + cfg.deck_heights.size(): return "Deck[%d]" % (id - P - N - 4)
+	else:                return "Height"
 
 
 func _get_handle_value(gizmo: EditorNode3DGizmo, id: int, secondary: bool) -> Variant:
@@ -74,7 +77,8 @@ func _get_handle_value(gizmo: EditorNode3DGizmo, id: int, secondary: bool) -> Va
 	elif id == P+N+1:    return cfg.bow_x
 	elif id == P+N+2:    return cfg.stern_rake
 	elif id == P+N+3:    return cfg.bow_rake
-	else:                return cfg.deck_heights.duplicate()
+	elif id < P + N + 4 + cfg.deck_heights.size(): return cfg.deck_heights.duplicate()
+	else:                return cfg.rib_height_base
 
 
 # ── Live drag ─────────────────────────────────────────────────────────────────
@@ -110,11 +114,13 @@ func _set_handle(gizmo: EditorNode3DGizmo, id: int, secondary: bool,
 		var hit: Variant = Plane(Vector3(0, 1, 0), 0.0).intersects_ray(ro, rd)
 		if hit != null:
 			cfg.stern_x = minf((hit as Vector3).x, cfg.rib_x_positions[0] - 0.5)
+			cfg._respace_ribs()
 
 	elif id == P + N + 1:
 		var hit: Variant = Plane(Vector3(0, 1, 0), 0.0).intersects_ray(ro, rd)
 		if hit != null:
 			cfg.bow_x = maxf((hit as Vector3).x, cfg.rib_x_positions[N - 1] + 0.5)
+			cfg._respace_ribs()
 
 	elif id == P + N + 2:
 		# Stern rake top — drag in XY plane (Z=0); horizontal offset from stern_x sets rake
@@ -127,6 +133,13 @@ func _set_handle(gizmo: EditorNode3DGizmo, id: int, secondary: bool,
 		var hit: Variant = Plane(Vector3(0, 0, 1), 0.0).intersects_ray(ro, rd)
 		if hit != null:
 			cfg.bow_rake = clampf((hit as Vector3).x - cfg.bow_x, -1.0, 4.0)
+
+	elif id == P + N + 4 + cfg.deck_heights.size():
+		# Height handle — drag vertically at midship
+		var plane := Plane(Vector3(0, 0, 1), 0.0)
+		var hit: Variant = plane.intersects_ray(ro, rd)
+		if hit != null:
+			cfg.rib_height_base = maxf((hit as Vector3).y, 0.5)
 
 	else:
 		# Deck: pick the vertical plane most face-on to camera for Y dragging
@@ -159,7 +172,8 @@ func _commit_handle(gizmo: EditorNode3DGizmo, id: int, secondary: bool,
 		elif id == P+N+1:    cfg.bow_x              = restore
 		elif id == P+N+2:    cfg.stern_rake         = restore
 		elif id == P+N+3:    cfg.bow_rake           = restore
-		else:                cfg.deck_heights       = restore
+		elif id < P + N + 4 + cfg.deck_heights.size(): cfg.deck_heights = restore
+		else:                cfg.rib_height_base    = restore
 	# Full rebuild — also marks resource dirty so Ctrl+S saves changes
 	cfg.emit_changed()
 
@@ -281,6 +295,11 @@ func _redraw(gizmo: EditorNode3DGizmo) -> void:
 	gizmo.add_handles(bp, get_material("h_bowstern", gizmo), bi)
 	if not dp.is_empty():
 		gizmo.add_handles(dp, get_material("h_deck", gizmo), di)
+
+	var D := cfg.deck_heights.size()
+	var hp := PackedVector3Array([Vector3(mid, cfg.rib_height_base, 0.0)])
+	var hi := PackedInt32Array([P + N + 4 + D])
+	gizmo.add_handles(hp, get_material("h_height", gizmo), hi)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

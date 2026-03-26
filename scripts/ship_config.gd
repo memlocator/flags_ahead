@@ -6,8 +6,9 @@ extends Resource
 ## Create different ship types as .tres files and assign to a ShipSkeleton.
 
 # Number of ribs — changing this evenly respaces them between stern and bow.
-@export_range(2, 20) var rib_count: int = 5:
+@export_range(2, 50) var rib_count: int = 5:
 	set(v):
+		rib_count = v
 		if rib_x_positions.size() != v:
 			_respace_ribs()
 			emit_changed()
@@ -27,10 +28,10 @@ extends Resource
 @export var bow_x: float = 5.1
 
 # How far the bow stem rakes forward from keel to gunwale (0 = vertical stem)
-@export_range(0.0, 3.0, 0.05) var bow_rake: float = 0.0
+@export var bow_rake: float = 0.0
 
 # How far the sternpost rakes aft from keel to gunwale (negative = rakes aft)
-@export_range(-2.0, 0.5, 0.05) var stern_rake: float = 0.0
+@export var stern_rake: float = 0.0
 
 # Where the transom stern sits (should be beyond the last negative rib)
 @export var stern_x: float = -5.0
@@ -64,18 +65,24 @@ extends Resource
 # Heights at which horizontal deck girder beams are generated (snap targets for floors)
 @export var deck_heights: Array[float] = [2.0, 3.5]
 
+# Uniform scale applied to all output geometry (design values stay as-is)
+@export var scale_factor: float = 1.0
+
 
 # Derived helpers ─────────────────────────────────────────────────────────────
 
+## Raw (unscaled) rib height — used internally for dimensionless ratios.
 func rib_height(rib_x: float) -> float:
 	return rib_height_base - absf(rib_x) * rib_height_taper
 
 
+## Raw (unscaled) half-beam — used internally for dimensionless ratios.
 func rib_half_width(rib_x: float) -> float:
 	return (rib_width_base - absf(rib_x) * rib_width_taper) * 0.5
 
 
 ## All bay station X values in ascending order, including bow and stern endpoints.
+## Returns raw (design-space) values — callers that work in world space must apply scale_factor.
 func bay_stations() -> Array[float]:
 	var stations: Array[float] = []
 	stations.append(stern_x)
@@ -86,46 +93,55 @@ func bay_stations() -> Array[float]:
 	return stations
 
 
-## Hull profile sampled at rib_x, in skeleton local space.
+## Hull profile sampled at rib_x, in skeleton local space (scaled by scale_factor).
 ## side: +1.0 = starboard, -1.0 = port
 func rib_profile_points(rib_x: float, side: float) -> PackedVector3Array:
+	var sf := scale_factor
 	var h  := rib_height(rib_x)
 	var hw := rib_half_width(rib_x)
 	var pts := PackedVector3Array()
 	for p: Vector2 in hull_profile:
-		pts.append(Vector3(rib_x, p.x * h, side * p.y * hw))
+		pts.append(Vector3(rib_x * sf, p.x * h * sf, side * p.y * hw * sf))
 	return pts
 
 
-## Bow cap: profile points converge toward bow_x.
-## With bow_radius > 0 the upper points fan out to a rounded face instead of a sharp stem.
-## Points along the bow stem curve (centerline). side param unused — stem is on Z=0.
+## Bow stem profile — points converge to the centreline at bow_x (scaled).
 func bow_stem_points(_side: float = 1.0) -> PackedVector3Array:
+	var sf  := scale_factor
 	var h   := rib_height(rib_x_positions[rib_x_positions.size() - 1])
 	var pts := PackedVector3Array()
 	for p: Vector2 in hull_profile:
-		pts.append(Vector3(bow_x + bow_rake * p.x, p.x * h, 0.0))
+		pts.append(Vector3((bow_x + bow_rake * p.x) * sf, p.x * h * sf, 0.0))
 	return pts
 
 
-## Stern post points: profile converges to the centreline along the stern post,
-## mirroring how bow_stem_points works for the bow.
+## Stern post profile — points converge to the centreline at stern_x (scaled).
 func stern_profile_points(_side: float = 1.0) -> PackedVector3Array:
+	var sf  := scale_factor
 	var h   := rib_height(rib_x_positions[0])
 	var pts := PackedVector3Array()
 	for p: Vector2 in hull_profile:
-		pts.append(Vector3(stern_x + stern_rake * p.x, p.x * h, 0.0))
+		pts.append(Vector3((stern_x + stern_rake * p.x) * sf, p.x * h * sf, 0.0))
 	return pts
 
 
-## Deck profile at a given station X and deck height Y — two points spanning port to starboard.
+## Deck profile at a given station X and deck height Y (both raw/design values).
+## Returns two scaled points spanning port to starboard.
 func deck_profile_points(station_x: float, deck_y: float) -> PackedVector3Array:
+	var sf := scale_factor
 	var t  := deck_y / maxf(rib_height(station_x), 0.001)
-	var hw := rib_half_width(station_x) * hull_z_at(t)
+	var hw := rib_half_width(station_x) * hull_z_at(t) * sf
 	var pts := PackedVector3Array()
-	pts.append(Vector3(station_x, deck_y, -hw))
-	pts.append(Vector3(station_x, deck_y,  hw))
+	pts.append(Vector3(station_x * sf, deck_y * sf, -hw))
+	pts.append(Vector3(station_x * sf, deck_y * sf,  hw))
 	return pts
+
+
+@export_tool_button("↺ Redistribute Ribs") var _btn_ribs: Callable = redistribute_ribs
+
+func redistribute_ribs() -> void:
+	_respace_ribs()
+	emit_changed()
 
 
 func _respace_ribs() -> void:

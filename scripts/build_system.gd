@@ -12,7 +12,7 @@ extends Node3D
 @export var rotation_smooth: float = 14.0
 @export var skeletons_root: Node3D
 
-var selected_piece: StringName = &"plank"
+var selected_piece: StringName = &""
 var _target_rots: Array[float] = [0.0, 0.0, 0.0]
 var _smooth_spin_rot: Basis = Basis.IDENTITY
 var _smooth_mirror_spin_rot: Basis = Basis.IDENTITY
@@ -56,14 +56,6 @@ var _ghost_pivot_mirror: Node3D
 var _ghost_mesh_node_mirror: Node3D
 var _axis_indicator: MeshInstance3D
 
-# Hull-curve bending state
-var _hull_curve: HullCurve
-var _is_bent_mode: bool = false
-var _current_bend_offsets: PackedFloat32Array
-var _last_bend_hit_y: float = -999.0
-
-const HULL_PIECE_TYPES: Array = [&"plank", &"iron_plank"]
-
 # Hull panel state
 var _hull_panel_pts_a: PackedVector3Array
 var _hull_panel_pts_b: PackedVector3Array
@@ -84,8 +76,6 @@ var _deck_panel_stations: Array[float] = []
 
 
 func _ready() -> void:
-	_hull_curve = HullCurve.new()
-	add_child(_hull_curve)
 	_setup_mirror_ghost()
 	await get_tree().process_frame
 	_rebuild_ghost()
@@ -121,6 +111,8 @@ func _clear_node_children(node: Node3D) -> void:
 
 func _rebuild_ghost() -> void:
 	_clear_node_children(ghost_mesh_node)
+	if selected_piece == &"":
+		return
 	ghost_mesh_node.add_child(PieceMeshBuilder.build_ghost(selected_piece))
 	if _ghost_mesh_node_mirror:
 		_clear_node_children(_ghost_mesh_node_mirror)
@@ -141,9 +133,6 @@ func select_piece(type: StringName) -> void:
 		_smooth_spin_rot = Basis.IDENTITY
 		_smooth_mirror_spin_rot = Basis.IDENTITY
 	_piece_index = PIECE_CYCLE.find(type)
-	_is_bent_mode = false
-	_current_bend_offsets = PackedFloat32Array()
-	_last_bend_hit_y = -999.0
 	_hull_panel_skel = null
 	_hull_panel_bay_a = 9999.0
 	_hull_panel_bay_b = 9999.0
@@ -194,6 +183,12 @@ func _physics_process(delta: float) -> void:
 	var hit_point: Vector3 = result.position
 	var hit_normal: Vector3 = result.normal
 
+	# Keep symmetry plane aligned to whatever skeleton we're hovering
+	var hit_skel := BuildUtils.find_ancestor(result.collider, ShipSkeleton) as ShipSkeleton
+	if hit_skel:
+		symmetry_origin = hit_skel.global_position
+		symmetry_normal = hit_skel.global_transform.basis.z.normalized()
+
 	if hit_normal.dot(_last_normal) < 0.9999:
 		_smooth_spin_rot = Basis.IDENTITY
 		_smooth_mirror_spin_rot = Basis.IDENTITY
@@ -234,25 +229,6 @@ func _physics_process(delta: float) -> void:
 	ghost_pivot.visible         = true
 	_ghost_valid                = true
 	_ghost_world_center         = hit_point + ghost_mesh_node.position
-
-	# Hull bending — update ghost mesh when a hull piece hovers over skeleton geometry
-	var want_bent: bool = (selected_piece in HULL_PIECE_TYPES
-			and result.collider.collision_layer & 1 != 0
-			and absf(hit_normal.y) < 0.7)
-	if want_bent:
-		var skel_node: Node3D = BuildUtils.find_ancestor(result.collider, ShipSkeleton) as Node3D
-		var skel_origin_y: float = skel_node.global_position.y if skel_node else 0.0
-		var hit_y_local: float = hit_point.y - skel_origin_y
-		if absf(hit_y_local - _last_bend_hit_y) > 0.05:
-			_last_bend_hit_y = hit_y_local
-			_current_bend_offsets = _hull_curve.get_bend_offsets(hit_y_local, sz.x)
-			_rebuild_bent_ghost()
-		_is_bent_mode = true
-	elif _is_bent_mode:
-		_is_bent_mode = false
-		_current_bend_offsets = PackedFloat32Array()
-		_last_bend_hit_y = -999.0
-		_rebuild_ghost()
 
 	# Axis indicator — at pivot, oriented along active spin_world
 	if _axis_indicator:
@@ -348,12 +324,12 @@ func _place_piece() -> void:
 		_place_skeleton()
 		return
 	var space := get_world_3d().direct_space_state
-	var piece := _spawn_piece(selected_piece, _ghost_world_center, ghost_mesh_node.basis, _current_bend_offsets)
+	var piece := _spawn_piece(selected_piece, _ghost_world_center, ghost_mesh_node.basis)
 	graph.add_piece(piece, space)
 	emit_signal("piece_added", piece, PlaceReason.PLAYER, null)
 
 	if symmetry_enabled:
-		var mirror := _spawn_piece(selected_piece, _ghost_mirror_center, _ghost_mirror_basis, _current_bend_offsets)
+		var mirror := _spawn_piece(selected_piece, _ghost_mirror_center, _ghost_mirror_basis)
 		graph.add_piece(mirror, space)
 		emit_signal("piece_added", mirror, PlaceReason.MIRROR, null)
 
@@ -376,13 +352,14 @@ func _process_hull_panel(result: Dictionary) -> void:
 		if _axis_indicator: _axis_indicator.visible = false
 		return
 
-	var hit_local := skel.to_local(result.position)
+	var cfg_hp    := skel._get_config()
+	var hit_local := skel.to_local(result.position) / cfg_hp.scale_factor
 	var side      := signf(hit_local.z)
 	if is_zero_approx(side): side = 1.0
 
 	# Cache bay_stations per skeleton — config doesn't change at runtime
 	if skel != _hull_panel_skel or _hull_panel_stations.is_empty():
-		_hull_panel_stations = skel._get_config().bay_stations()
+		_hull_panel_stations = cfg_hp.bay_stations()
 
 	# Find the bay (pair of adjacent stations) the cursor is in
 	var stations := _hull_panel_stations
@@ -469,13 +446,13 @@ func _process_deck_panel(result: Dictionary) -> void:
 		if _axis_indicator: _axis_indicator.visible = false
 		return
 
-	var hit_local := skel.to_local(result.position)
+	var cfg: ShipConfig = skel._get_config()
+	var hit_local := skel.to_local(result.position) / cfg.scale_factor
 
 	if skel != _deck_panel_skel or _deck_panel_stations.is_empty():
-		_deck_panel_stations = skel._get_config().bay_stations()
+		_deck_panel_stations = cfg.bay_stations()
 
-	# Snap to the nearest deck height
-	var cfg: ShipConfig = skel._get_config()
+	# Snap to the nearest deck height (raw comparison — hit_local is already in raw space)
 	var deck_y := cfg.deck_heights[0]
 	for h: float in cfg.deck_heights:
 		if absf(h - hit_local.y) < absf(deck_y - hit_local.y):
@@ -517,15 +494,17 @@ func _process_deck_panel(result: Dictionary) -> void:
 
 
 func _bay_deck_profile(cfg: ShipConfig, station_x: float, deck_y: float) -> PackedVector3Array:
+	# station_x and deck_y are raw (design-space); output must be scaled
+	var sf := cfg.scale_factor
 	if is_equal_approx(station_x, cfg.bow_x):
 		var h  := cfg.rib_height(cfg.rib_x_positions[-1])
 		var t  := deck_y / maxf(h, 0.001)
-		var pt := Vector3(cfg.bow_x + cfg.bow_rake * t, deck_y, 0.0)
+		var pt := Vector3((cfg.bow_x + cfg.bow_rake * t) * sf, deck_y * sf, 0.0)
 		return PackedVector3Array([pt, pt])
 	if is_equal_approx(station_x, cfg.stern_x):
 		var h  := cfg.rib_height(cfg.rib_x_positions[0])
 		var t  := deck_y / maxf(h, 0.001)
-		var pt := Vector3(cfg.stern_x + cfg.stern_rake * t, deck_y, 0.0)
+		var pt := Vector3((cfg.stern_x + cfg.stern_rake * t) * sf, deck_y * sf, 0.0)
 		return PackedVector3Array([pt, pt])
 	return cfg.deck_profile_points(station_x, deck_y)
 
@@ -551,14 +530,6 @@ func _place_deck_panel() -> void:
 	emit_signal("structure_changed")
 
 
-func _rebuild_bent_ghost() -> void:
-	_clear_node_children(ghost_mesh_node)
-	ghost_mesh_node.add_child(PieceMeshBuilder.build_bent_ghost(selected_piece, _current_bend_offsets))
-	if _ghost_mesh_node_mirror:
-		_clear_node_children(_ghost_mesh_node_mirror)
-		_ghost_mesh_node_mirror.add_child(PieceMeshBuilder.build_bent_ghost(selected_piece, _current_bend_offsets))
-
-
 func _place_skeleton() -> void:
 	if not skeletons_root:
 		push_warning("BuildSystem: skeletons_root not set")
@@ -572,14 +543,10 @@ func _place_skeleton() -> void:
 	emit_signal("structure_changed")
 
 
-func _spawn_piece(type: StringName, pos: Vector3, piece_basis: Basis,
-		offsets: PackedFloat32Array = PackedFloat32Array()) -> ShipPiece:
+func _spawn_piece(type: StringName, pos: Vector3, piece_basis: Basis) -> ShipPiece:
 	var piece := ShipPiece.new()
 	piece.setup(type)
-	if offsets.size() > 0:
-		piece.add_child(PieceMeshBuilder.build_bent_piece(type, offsets))
-	else:
-		piece.add_child(PieceMeshBuilder.build_piece(type))
+	piece.add_child(PieceMeshBuilder.build_piece(type))
 	placed_pieces_node.add_child(piece)
 	piece.global_position = pos
 	piece.basis = piece_basis

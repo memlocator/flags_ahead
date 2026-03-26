@@ -37,13 +37,24 @@ func _get_property_list() -> Array[Dictionary]:
 		"name": "Hull Config", "type": TYPE_NIL,
 		"usage": PROPERTY_USAGE_GROUP, "hint_string": ""
 	})
+	const SKIP := ["script", "resource_local_to_scene", "resource_name",
+			"resource_path", "resource_scene_unique_id", "metadata"]
 	for p in config.get_property_list():
+		if p["name"] in SKIP:
+			continue
 		if p["usage"] & PROPERTY_USAGE_EDITOR:
-			props.append(p)
+			var ep := p.duplicate()
+			ep["usage"] = PROPERTY_USAGE_EDITOR  # strip STORAGE so Godot never bakes these into the scene
+			props.append(ep)
 	return props
 
 
+const _PASSTHROUGH_SKIP := [&"script", &"resource_local_to_scene", &"resource_name",
+		&"resource_path", &"resource_scene_unique_id"]
+
 func _get(property: StringName) -> Variant:
+	if property in _PASSTHROUGH_SKIP:
+		return null
 	if config:
 		var val = config.get(property)
 		if val != null:
@@ -52,6 +63,8 @@ func _get(property: StringName) -> Variant:
 
 
 func _set(property: StringName, value: Variant) -> bool:
+	if property in _PASSTHROUGH_SKIP:
+		return false
 	if config and config.get(property) != null:
 		config.set(property, value)
 		return true
@@ -113,21 +126,24 @@ func _make_box(size: Vector3, pos: Vector3, rot_z_deg: float = 0.0,
 
 
 func _add_keel(cfg: ShipConfig) -> void:
-	var length := absf(cfg.bow_x - cfg.stern_x)
-	var mid_x  := (cfg.bow_x + cfg.stern_x) * 0.5
-	_make_box(Vector3(length, 0.3, 0.3), Vector3(mid_x, 0.15, 0), 0.0, KEEL_COLOR)
+	var sf     := cfg.scale_factor
+	var length := absf(cfg.bow_x - cfg.stern_x) * sf
+	var mid_x  := (cfg.bow_x + cfg.stern_x) * 0.5 * sf
+	_make_box(Vector3(length, 0.3 * sf, 0.3 * sf), Vector3(mid_x, 0.15 * sf, 0), 0.0, KEEL_COLOR)
 
 
 func _add_bow(cfg: ShipConfig) -> void:
+	var sf         := cfg.scale_factor
 	var last_rib_x := cfg.rib_x_positions[cfg.rib_x_positions.size() - 1]
-	var bow_h      := cfg.rib_height(last_rib_x)
-	_add_post_curve(cfg.bow_x, bow_h, cfg.bow_rake)
+	var bow_h      := cfg.rib_height(last_rib_x) * sf
+	_add_post_curve(cfg.bow_x * sf, bow_h, cfg.bow_rake * sf)
 
 
 func _add_stern(cfg: ShipConfig) -> void:
+	var sf          := cfg.scale_factor
 	var first_rib_x := cfg.rib_x_positions[0]
-	var stern_h     := cfg.rib_height(first_rib_x)
-	_add_post_curve(cfg.stern_x, stern_h, cfg.stern_rake)
+	var stern_h     := cfg.rib_height(first_rib_x) * sf
+	_add_post_curve(cfg.stern_x * sf, stern_h, cfg.stern_rake * sf)
 
 
 ## Builds a curved post (stem or sternpost) in the XY plane from keel to gunwale.
@@ -155,8 +171,9 @@ func _add_ribs(cfg: ShipConfig) -> void:
 
 
 func _add_curved_rib(cfg: ShipConfig, rib_x: float) -> void:
-	var height := cfg.rib_height(rib_x)
-	var half_w := cfg.rib_half_width(rib_x)
+	var sf     := cfg.scale_factor
+	var height := cfg.rib_height(rib_x) * sf
+	var half_w := cfg.rib_half_width(rib_x) * sf
 	for i in range(cfg.hull_profile.size() - 1):
 		var p1: Vector2 = cfg.hull_profile[i]
 		var p2: Vector2 = cfg.hull_profile[i + 1]
@@ -168,8 +185,8 @@ func _add_curved_rib(cfg: ShipConfig, rib_x: float) -> void:
 		var rot_x   := atan2(dz, dy)
 		var mid_y   := (y1 + y2) * 0.5
 		var mid_z   := (z1 + z2) * 0.5
-		_make_rib_seg(Vector3(rib_x, mid_y,  mid_z), seg_len,  rot_x)
-		_make_rib_seg(Vector3(rib_x, mid_y, -mid_z), seg_len, -rot_x)
+		_make_rib_seg(Vector3(rib_x * sf, mid_y,  mid_z), seg_len,  rot_x)
+		_make_rib_seg(Vector3(rib_x * sf, mid_y, -mid_z), seg_len, -rot_x)
 
 
 func _make_rib_seg(pos: Vector3, seg_len: float, rot_x: float) -> Node3D:
@@ -192,13 +209,15 @@ func _make_rib_seg(pos: Vector3, seg_len: float, rot_x: float) -> Node3D:
 # ── Deck girders ──────────────────────────────────────────────────────────────
 
 func _add_deck_girders(cfg: ShipConfig) -> void:
+	var sf := cfg.scale_factor
 	for deck_y: float in cfg.deck_heights:
+		var y_pos := deck_y * sf
 		for rib_x: float in cfg.rib_x_positions:
 			if deck_y >= cfg.rib_height(rib_x):
 				continue
-			var beam_hw := _rib_z_at_y(cfg, rib_x, deck_y)
+			var beam_hw := _rib_z_at_y(cfg, rib_x, y_pos)
 			_make_box(Vector3(RIB_THICKNESS, RIB_THICKNESS, beam_hw * 2.0),
-					Vector3(rib_x, deck_y, 0.0), 0.0, GIRDER_COLOR)
+					Vector3(rib_x * sf, y_pos, 0.0), 0.0, GIRDER_COLOR)
 
 
 ## Interpolate the Z half-width of the hull at world Y = y on rib at rib_x,
@@ -215,24 +234,26 @@ func _rib_z_at_y(cfg: ShipConfig, rib_x: float, y: float) -> float:
 # ── Bow / stern stringers (profile points → post at same height) ──────────────
 
 func _add_bow_stringers(cfg: ShipConfig) -> void:
+	var sf     := cfg.scale_factor
 	var last_x := cfg.rib_x_positions[cfg.rib_x_positions.size() - 1]
-	var h      := cfg.rib_height(last_x)
+	var h      := cfg.rib_height(last_x) * sf
 	for side in [-1.0, 1.0]:
 		var pts := cfg.rib_profile_points(last_x, side)
 		for i in range(pts.size()):
 			var t    := cfg.hull_profile[i].x
-			var stem := Vector3(cfg.bow_x + cfg.bow_rake * t, t * h, 0.0)
+			var stem := Vector3((cfg.bow_x + cfg.bow_rake * t) * sf, t * h, 0.0)
 			_add_rail_seg(pts[i], stem)
 
 
 func _add_stern_stringers(cfg: ShipConfig) -> void:
+	var sf      := cfg.scale_factor
 	var first_x := cfg.rib_x_positions[0]
-	var h       := cfg.rib_height(first_x)
+	var h       := cfg.rib_height(first_x) * sf
 	for side in [-1.0, 1.0]:
 		var pts := cfg.rib_profile_points(first_x, side)
 		for i in range(pts.size()):
 			var t    := cfg.hull_profile[i].x
-			var post := Vector3(cfg.stern_x + cfg.stern_rake * t, t * h, 0.0)
+			var post := Vector3((cfg.stern_x + cfg.stern_rake * t) * sf, t * h, 0.0)
 			_add_rail_seg(pts[i], post)
 
 
