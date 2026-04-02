@@ -15,6 +15,7 @@ extends Node3D
 @onready var ocean               := $Ocean
 
 var _ship_editor: ShipEditor
+var _ship_launcher: ShipLauncher
 
 
 func _ready() -> void:
@@ -29,6 +30,10 @@ func _ready() -> void:
 	_ship_editor.camera       = camera
 	_ship_editor.camera_pivot = camera_pivot
 	add_child(_ship_editor)
+
+	_ship_launcher = ShipLauncher.new()
+	_ship_launcher.ocean = ocean
+	add_child(_ship_launcher)
 
 	# Wire up any interactables already in the scene
 	_connect_interactables()
@@ -106,6 +111,12 @@ func _connect_interactable(interactable: ShipSkeletonInteractable) -> void:
 	if not interactable.interact_requested.is_connected(_on_interact_requested):
 		interactable.interact_requested.connect(_on_interact_requested.bind(interactable))
 		print("ShipEditor: connected interactable ", interactable.get_path())
+	if not interactable.launch_requested.is_connected(_on_launch_requested):
+		interactable.launch_requested.connect(_on_launch_requested)
+
+
+func _on_launch_requested(skeleton: ShipSkeleton) -> void:
+	_ship_launcher.launch(skeleton)
 
 
 func _on_interact_requested(skeleton: ShipSkeleton, interactable: ShipSkeletonInteractable) -> void:

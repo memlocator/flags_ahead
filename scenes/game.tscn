@@ -10,6 +10,9 @@
 [ext_resource type="Script" uid="uid://0301q3mp5tw3" path="res://scripts/ship_skeleton_interactable.gd" id="8_interactable"]
 [ext_resource type="Resource" uid="uid://dfp4woudtokyd" path="res://assets/ships/sloop.tres" id="9_sloop"]
 [ext_resource type="Script" uid="uid://drrbfcaqxjeol" path="res://scripts/ocean.gd" id="10_ocean"]
+[ext_resource type="Script" uid="uid://ddeogsv3qv1mb" path="res://scripts/buoyancy_body.gd" id="11_buoyancy"]
+[ext_resource type="Environment" uid="uid://6wyydsv7ojy" path="res://effects/underwater.tres" id="11_kvuet"]
+[ext_resource type="Script" uid="uid://bfm71w3n1nn4m" path="res://scripts/buoyancy_sensor.gd" id="12_sensor"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_env"]
 
@@ -63,8 +66,19 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -9.536743e-07)
 mesh = SubResource("BoxMesh_ground")
 surface_material_override/0 = SubResource("Mat_ground")
 
+[node name="Ground" type="StaticBody3D" parent="Ground" unique_id=754836613]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -46.70761, -3.8781796, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Ground/Ground" unique_id=1405543522]
+shape = SubResource("BoxShape3D_ground")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Ground/Ground" unique_id=1730769926]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -9.536743e-07)
+mesh = SubResource("BoxMesh_ground")
+surface_material_override/0 = SubResource("Mat_ground")
+
 [node name="Player" type="CharacterBody3D" parent="." unique_id=1853105257]
-transform = Transform3D(-0.75, 0, -1.13246855e-07, 0, 0.75, 0, 1.13246855e-07, 0, -0.75, 3, 1, 5)
+transform = Transform3D(-0.75, 0, -1.13246855e-07, 0, 0.75, 0, 1.13246855e-07, 0, -0.75, -27.625938, 1, -15.870958)
 script = ExtResource("5_player")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Player" unique_id=1649244819]
@@ -74,7 +88,7 @@ shape = SubResource("CapsuleShape3D_player")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.9, 0)
 
 [node name="CameraPivot" type="Node3D" parent="." unique_id=846003860]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5784817, 0, 5.097081)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -28.047457, 0, -15.773877)
 script = ExtResource("2_cam")
 shoulder_offset = 1.0
 zoom_step = 0.75
@@ -87,6 +101,7 @@ spring_length = 2.0
 [node name="Camera3D" type="Camera3D" parent="CameraPivot/SpringArm3D" unique_id=123456789]
 
 [node name="SkeletonsRoot" type="Node3D" parent="." unique_id=298765432]
+transform = Transform3D(-5.9604645e-08, 0, -1, 0, 1, 0, 1, 0, -5.9604645e-08, -32.24369, -1.6370164, -16.236477)
 
 [node name="Sloop" type="Node3D" parent="SkeletonsRoot" unique_id=112233445]
 script = ExtResource("3_skel")
@@ -94,6 +109,35 @@ config = ExtResource("9_sloop")
 
 [node name="Interactable" type="Node3D" parent="SkeletonsRoot/Sloop" unique_id=112233446]
 script = ExtResource("8_interactable")
+
+[node name="BuoyancyBody" type="Node3D" parent="SkeletonsRoot/Sloop" unique_id=112233447]
+script = ExtResource("11_buoyancy")
+buoyancy_strength = 65.0
+damping = 1.0
+
+[node name="SensorBowPort" type="Marker3D" parent="SkeletonsRoot/Sloop/BuoyancyBody" unique_id=112233450]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.6560817, -1.2999992)
+script = ExtResource("12_sensor")
+
+[node name="SensorBowStarboard" type="Marker3D" parent="SkeletonsRoot/Sloop/BuoyancyBody" unique_id=112233451]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.6560817, 1.2999992)
+script = ExtResource("12_sensor")
+
+[node name="SensorMidPort" type="Marker3D" parent="SkeletonsRoot/Sloop/BuoyancyBody" unique_id=112233452]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0.6560817, -1.5)
+script = ExtResource("12_sensor")
+
+[node name="SensorMidStarboard" type="Marker3D" parent="SkeletonsRoot/Sloop/BuoyancyBody" unique_id=112233453]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0.6560817, 1.5)
+script = ExtResource("12_sensor")
+
+[node name="SensorSternPort" type="Marker3D" parent="SkeletonsRoot/Sloop/BuoyancyBody" unique_id=112233454]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.5, 0.6560817, -1.3999958)
+script = ExtResource("12_sensor")
+
+[node name="SensorSternStarboard" type="Marker3D" parent="SkeletonsRoot/Sloop/BuoyancyBody" unique_id=112233455]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.5, 0.6560817, 1.4000015)
+script = ExtResource("12_sensor")
 
 [node name="ShipRoot" type="RigidBody3D" parent="." unique_id=614811410]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -42.97306, -8.410027, 0)
@@ -126,6 +170,9 @@ roughness_near = 0.0
 specular_str = 0.7
 sss_color = Color(0, 0.5331359, 0.54881036, 1)
 caustic_str = 0.65
+macro_str = 0.0
+underwater_env = ExtResource("11_kvuet")
+underwater_fog_density = 0.5
 foam_contact_band = 0.6
 foam_contact_gain = 1.6
 
