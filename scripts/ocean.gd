@@ -1,3 +1,4 @@
+@tool
 class_name Ocean
 extends Node3D
 
@@ -59,6 +60,12 @@ var _materials: Array[ShaderMaterial] = []
 
 
 func _ready() -> void:
+	# Ensure we don't spawn duplicate rings when the tool script re-runs in editor.
+	if _materials.size() > 0 or get_child_count() > 0:
+		return
+
+	process_mode = Node.PROCESS_MODE_ALWAYS
+
 	var shader := load("res://shaders/ocean.gdshader") as Shader
 	# Render priority: far=0, outer=1, inner=2 — inner renders last so its
 	# depth writes always win over the outer rings (fixes water-through-water).
@@ -100,7 +107,9 @@ func _make_material(shader: Shader, min_dist: float, max_dist: float, priority: 
 
 func _process(delta: float) -> void:
 	_time += delta
-	var t := _time * time_scale
+
+	# In the editor, drive time from a monotonic clock so the ocean animates in the viewport.
+	var t: float = (Time.get_ticks_msec() / 1000.0) if Engine.is_editor_hint() else _time * time_scale
 	for m: ShaderMaterial in _materials:
 		m.set_shader_parameter("wave_time",      t)
 		m.set_shader_parameter("steepness",      steepness)
@@ -118,7 +127,7 @@ func _process(delta: float) -> void:
 		m.set_shader_parameter("sss_color",      sss_color)
 		m.set_shader_parameter("caustic_str",    caustic_str)
 
-	if follow_target:
+	if follow_target and not Engine.is_editor_hint():
 		global_position.x = follow_target.global_position.x
 		global_position.z = follow_target.global_position.z
 

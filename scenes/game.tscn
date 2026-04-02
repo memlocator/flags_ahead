@@ -96,7 +96,7 @@ config = ExtResource("9_sloop")
 script = ExtResource("8_interactable")
 
 [node name="ShipRoot" type="RigidBody3D" parent="." unique_id=614811410]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -42.97306, -8.3742485, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -42.97306, -8.410027, 0)
 freeze = true
 
 [node name="KeelGroup" type="Node3D" parent="ShipRoot" unique_id=1531864649]
@@ -105,6 +105,7 @@ script = ExtResource("3_skel")
 [node name="PlacedPieces" type="Node3D" parent="ShipRoot" unique_id=1577087030]
 
 [node name="Ocean" type="Node3D" parent="." unique_id=321654987]
+process_mode = 3
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -5.172516, 0)
 script = ExtResource("10_ocean")
 inner_radius = 600.0
@@ -114,10 +115,11 @@ far_size = 15000.0
 far_subdivs = 150
 steepness = 1.0
 depth_fog_end = 4.0
-foam_height = 0.46
+foam_height = 0.5
 color_deep = Color(0.04949283, 0.29426005, 0.35247186, 1)
-color_shallow = Color(0.007843138, 0.33333334, 0.5372549, 1)
+color_shallow = Color(0.0029358075, 0.20479247, 0.34123835, 1)
 sss_color = Color(0, 0.5331359, 0.54881036, 1)
+caustic_str = 0.65
 
 [node name="BuildSystem" type="Node3D" parent="." unique_id=196088708]
 script = ExtResource("4_build")
@@ -142,6 +144,6 @@ offset_bottom = 60.0
 text = "Loading..."
 
 [node name="Gound" type="MeshInstance3D" parent="." unique_id=240166657]
-transform = Transform3D(300, 0, 0, 0, 1, 0, 0, 0, 300, -81.28996, -9.390339, -0.045967102)
+transform = Transform3D(300, 0, 0, 0, 1, 0, 0, 0, 300, -81.28996, -8.792757, -0.045967102)
 mesh = SubResource("BoxMesh_ground")
 surface_material_override/0 = SubResource("StandardMaterial3D_vtaks")

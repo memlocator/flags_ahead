@@ -58,7 +58,10 @@ float _hash(vec2 p) {
 float _vnoise(vec2 p) {
 	vec2 i = floor(p);
 	vec2 f = fract(p);
-	vec2 u = f * f * (3.0 - 2.0 * f);
+	// Quintic interpolation (Perlin improved) — C2 smooth.
+	// Cubic smoothstep is only C1: the gradient has kinks at cell boundaries,
+	// which show as bright strips when used for normal-map finite differences.
+	vec2 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
 	return mix(
 		mix(_hash(i),                 _hash(i + vec2(1.0, 0.0)), u.x),
 		mix(_hash(i + vec2(0.0, 1.0)), _hash(i + vec2(1.0, 1.0)), u.x),
@@ -76,10 +79,6 @@ float _fbm(vec2 p) {
 	return v;
 }
 
-float _wfbm(vec2 p) {
-	vec2 q = vec2(_fbm(p), _fbm(p + vec2(5.2, 1.3)));
-	return _fbm(p + 2.5 * q);
-}
 
 // ── Stochastic FBM (Inigo Quilez technique) ───────────────────────────────────
 // Divides the plane into large random cells. Each cell samples FBM at a unique
@@ -108,12 +107,64 @@ float _sfbm(vec2 p, float cell_scale) {
 	vec2 h01 = _hash2v(ci + vec2(0.0, 1.0));
 	vec2 h11 = _hash2v(ci + vec2(1.0, 1.0));
 
-	float n00 = _fbm(_rot2(h00.x * 6.28318) * p + h00 * 47.3);
-	float n10 = _fbm(_rot2(h10.x * 6.28318) * p + h10 * 47.3);
-	float n01 = _fbm(_rot2(h01.x * 6.28318) * p + h01 * 47.3);
-	float n11 = _fbm(_rot2(h11.x * 6.28318) * p + h11 * 47.3);
+	// Use cp (cell-space) not p (world-space) — world-space put _vnoise at 1m
+	// cell scale, creating gradient discontinuities at integer world coords.
+	// Cell-space keeps the finest features at ~cell_size/8 in world units.
+	float n00 = _fbm(_rot2(h00.x * 6.28318) * cp + h00 * 4.7);
+	float n10 = _fbm(_rot2(h10.x * 6.28318) * cp + h10 * 4.7);
+	float n01 = _fbm(_rot2(h01.x * 6.28318) * cp + h01 * 4.7);
+	float n11 = _fbm(_rot2(h11.x * 6.28318) * cp + h11 * 4.7);
 
 	return mix(mix(n00, n10, u.x), mix(n01, n11, u.x), u.y);
+}
+
+
+// ── Gabor wave-packet slope ───────────────────────────────────────────────────
+// Scatters stochastic Gabor kernels (Gaussian × directional cosine) over the
+// plane.  Each kernel has an analytically-derived gradient — no cell-boundary
+// artefacts, unlike FBM finite-differences which have gradient kinks every ~3 m.
+//
+// p    : world XZ position
+// dir  : unit propagation direction
+// t    : time
+// freq : spatial frequency (rad/m)   — controls wavelength (λ = 2π/freq)
+// sig  : Gaussian envelope radius (m)— controls crest length (≈ sig in perp dir)
+// asp  : along-dir / perp-dir radius ratio (>1 → compact along dir, long crests)
+// spd  : phase speed (m/s)
+vec2 _gabor_slope(vec2 p, vec2 dir, float t,
+                  float freq, float sig, float asp, float spd) {
+    vec2  perp = vec2(-dir.y, dir.x);
+    float sig2 = sig * sig;
+    float asp2 = asp * asp;
+    float grid = sig * 2.0;         // boundary kernel is 4σ away → Gaussian ≈ exp(-8) ≈ 0.0003 (invisible)
+    vec2  gi   = floor(p / grid);
+    vec2  acc  = vec2(0.0);
+    for (int ix = -2; ix <= 2; ix++) {
+        for (int iy = -2; iy <= 2; iy++) {
+            vec2  ci  = gi + vec2(float(ix), float(iy));
+            vec2  h   = _hash2v(ci);
+            vec2  h2  = _hash2v(ci + vec2(37.1, 91.7));
+            // random centre within cell, random phase, random amplitude
+            vec2  ctr = (ci + h) * grid;
+            float phi = h2.x * 6.28318 - freq * spd * t;
+            float amp = 0.5 + 0.5 * h2.y;
+            vec2  dp   = p - ctr;
+            float dpar = dot(dp, dir);
+            float dper = dot(dp, perp);
+            // anisotropic Gaussian: compact along dir (asp×), wide perpendicular
+            float d2 = asp2 * dpar * dpar + dper * dper;
+            if (d2 > sig2 * 16.0) continue;
+            float G    = exp(-d2 / (2.0 * sig2));
+            float arg  = freq * dpar + phi;
+            float cosA = cos(arg);
+            float sinA = sin(arg);
+            // ∇(G · cos(freq·dpar+phi)) = cos · ∇G + G · (-freq·dir·sin)
+            // ∇G = -G · (asp²·dpar·dir + dper·perp) / sig²
+            vec2 dG = -G * (asp2 * dpar * dir + dper * perp) / sig2;
+            acc += amp * (cosA * dG - G * freq * dir * sinA);
+        }
+    }
+    return acc;
 }
 
 
@@ -140,6 +191,17 @@ vec3 _gerstner(vec4 wave, float phase, vec2 xz, float t,
 	            q * a * d.y * cos(f));
 }
 
+// Returns XZ surface slope for one wave — analytical derivative of height.
+// phase_offset is a smooth world-space scalar that breaks periodicity without
+// gradient discontinuities (adding a smooth value to f keeps cos smooth).
+vec2 _wave_slope(vec4 wave, vec2 xz, float t, float phase_offset) {
+	vec2  d = normalize(wave.xy);
+	float k = TAU / wave.w;
+	float c = sqrt(9.8 / k);
+	float f = k * dot(d, xz) - k * c * t + phase_offset;
+	return d * (wave.z * k * cos(f));
+}
+
 
 void vertex() {
 	vec2  wxz    = VERTEX.xz + MODEL_MATRIX[3].xz;
@@ -164,27 +226,12 @@ void vertex() {
 	// wave_g (2.7 m) and wave_h (1.8 m) are near/below the Nyquist limit of the
 	// inner ring's 0.8 m vertex spacing — they alias as geometry, live in the normal map.
 
-	// Four-scale FBM chop — each scale at a unique frequency, direction and speed
-	// so no single tile scale dominates.
-	float chop = 0.0;
-	chop += (_wfbm(wxz * 0.09 + vec2( t*0.03,  t*0.02))              - 0.5) * 0.50;
-	chop += (_fbm( wxz * 0.22 + vec2(-t*0.05,  t*0.06) + vec2(2.3, 5.5)) - 0.5) * 0.28;
-	chop += (_fbm( wxz * 0.55 + vec2( t*0.09, -t*0.07) + vec2(7.1, 1.3)) - 0.5) * 0.14;
-	chop += (_vnoise(wxz * 1.30 + vec2(-t*0.13, t*0.10) + vec2(4.7, 9.2)) - 0.5) * 0.08;
-	disp.y += chop * chop_amp;
-
-	// Lateral (XZ) FBM displacement — physically shifts vertices sideways so
-	// Gerstner crests can't stay locked on a regular repeating grid.
-	vec2 lat = vec2(
-		_wfbm(wxz * 0.10 + vec2( t*0.028,  t*0.019) + vec2(1.3, 7.6)),
-		_wfbm(wxz * 0.10 + vec2(-t*0.033,  t*0.024) + vec2(5.4, 2.3))
-	) - 0.5;
-	disp.x += lat.x * chop_amp * 0.8;
-	disp.z += lat.y * chop_amp * 0.8;
-
+	// FBM chop and lateral displacement live in the normal map (DETAIL in fragment).
+	// Adding them here without matching normals creates a normal discontinuity at
+	// every quad edge — that's what causes the visible squares.
 	VERTEX  += disp;
 
-	float normal_flatness = clamp(lod_min_dist / 200.0, 0.0, 1.0);
+	float normal_flatness = 0.55 + clamp(lod_min_dist / 400.0, 0.0, 0.45);
 	vec3 geom_n = normalize(mix(normalize(cross(bin, tan)), vec3(0.0, 1.0, 0.0), normal_flatness));
 	vec3 geom_t = normalize(mix(normalize(tan),             vec3(1.0, 0.0, 0.0), normal_flatness));
 	vec3 geom_b = normalize(mix(normalize(bin),             vec3(0.0, 0.0, 1.0), normal_flatness));
@@ -193,9 +240,9 @@ void vertex() {
 	BINORMAL = geom_b;
 
 	v_wave_y         = disp.y;
-	v_world_xz_t     = vec3(VERTEX.xz + MODEL_MATRIX[3].xz, t);
+	v_world_xz_t     = vec3(wxz, t);  // pre-displacement: smooth varying, no quad-edge seams
 	v_cam_dist       = length(wxz - cam_xz);
-	v_geom_normal_y  = geom_n.y;  // 1.0 = flat, <1 = tilted/steep
+	v_geom_normal_y  = geom_n.y;
 }
 
 
@@ -206,28 +253,40 @@ void fragment() {
 	vec2  wxz = v_world_xz_t.xy;
 	float t   = v_world_xz_t.z;
 
-	// Per-pixel world-space footprint — geometrically correct LOD that doesn't
-	// shift when the camera translates (unlike a camera-distance heuristic).
-	float eps       = clamp(max(fwidth(wxz.x), fwidth(wxz.y)) * 2.0, 0.3, 5.0);
-	float dist_fade = 1.0 - smoothstep(0.4, 2.5, eps);
+	// Analytical normals: sum wave slope derivatives directly.
+	// Large-scale FBM (~55m features, quintic-smooth) as phase offsets — breaks
+	// the periodic sine interference without introducing gradient discontinuities.
+	float dist_fade = 1.0 - smoothstep(60.0, 200.0, v_cam_dist);
 
-	// Multi-scale detail using stochastic FBM for the coarse layers (no global period)
-	// and plain FBM for fine layers (high-freq detail tiles fast enough to be invisible).
-	#define DETAIL(p) ( \
-		_sfbm((p) + vec2( t*0.030,  t*0.020), 0.022) * 0.50 + \
-		_sfbm((p) + vec2(-t*0.048,  t*0.038) + vec2(3.3, 7.7), 0.038) * 0.26 + \
-		_fbm( (p) * 1.10  + vec2( t*0.110, -t*0.080) + vec2(1.5, 4.2)) * (0.16 * dist_fade) + \
-		_vnoise((p) * 2.80 + vec2(-t*0.180,  t*0.140) + vec2(8.3, 2.1)) * (0.08 * dist_fade) )
+	float pn1 = _vnoise(wxz * 0.025)                  * 3.2 + _vnoise(wxz * 0.008)                  * 2.8;
+	float pn2 = _vnoise(wxz * 0.025 + vec2(4.1, 7.3)) * 3.2 + _vnoise(wxz * 0.008 + vec2(4.1, 7.3)) * 2.8;
+	float pn3 = _vnoise(wxz * 0.031 + vec2(9.7, 2.5)) * 2.8 + _vnoise(wxz * 0.011 + vec2(3.6, 6.8)) * 2.4;
 
-	float dx = (DETAIL(wxz + vec2(eps, 0.0)) - DETAIL(wxz - vec2(eps, 0.0))) / (2.0 * eps);
-	float dz = (DETAIL(wxz + vec2(0.0, eps)) - DETAIL(wxz - vec2(0.0, eps))) / (2.0 * eps);
-	NORMAL_MAP       = normalize(vec3(-dx, -dz, 1.0)) * 0.5 + 0.5;
-	NORMAL_MAP_DEPTH = detail_strength * (0.5 + dist_fade * 0.5);
+	vec2 slope = vec2(0.0);
+	slope += _wave_slope(wave_a, wxz, t, pn1 * 1.0);
+	slope += _wave_slope(wave_b, wxz, t, pn2 * 0.8);
+	slope += _wave_slope(wave_c, wxz, t, pn3 * 1.2);
+	slope += _wave_slope(wave_d, wxz, t, pn1 * 0.6);
+	slope += _wave_slope(wave_e, wxz, t, pn2 * 1.4);
+	slope += _wave_slope(wave_f, wxz, t, pn3 * 0.9);
+	slope += _wave_slope(wave_g, wxz, t, pn1);
+	slope += _wave_slope(wave_h, wxz, t, pn2);
+	// Gabor wave-packet chop — stochastic Gabor kernels, no cell boundary strips.
+	// Layer 1: medium chop — ~14 m crests, moves with primary swell direction.
+	// Layer 2: fine chop  — ~7 m crests, secondary direction, fades at distance.
+	slope += _gabor_slope(wxz, normalize(wave_a.xy), t, 0.40, 3.0, 3.0, 1.5) * chop_amp * 5.0;
+	slope += _gabor_slope(wxz, normalize(wave_b.xy), t, 0.85, 1.5, 2.5, 2.2) * chop_amp * 4.0 * dist_fade;
 
-	float fresnel = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 3.0);
+	float nm_depth   = detail_strength;
+	NORMAL_MAP       = normalize(vec3(-slope.x, -slope.y, 1.0)) * 0.5 + 0.5;
+	NORMAL_MAP_DEPTH = nm_depth;
+
+	vec3 wave_n = normalize(vec3(-slope.x * nm_depth, 1.0, -slope.y * nm_depth));
+
+	float fresnel = pow(1.0 - clamp(dot(wave_n, VIEW), 0.0, 1.0), 3.0);
 	float crest_t = smoothstep(0.38, 0.62, v_wave_y);
 
-	vec2  ref_uv = SCREEN_UV + NORMAL.xy * refraction_str;
+	vec2  ref_uv = SCREEN_UV + wave_n.xz * refraction_str;
 	float surf_y = MODEL_MATRIX[3].y + v_wave_y;
 
 	// Depth check: if the refracted UV points at geometry above the ocean surface
@@ -289,12 +348,9 @@ void fragment() {
 	col += caustic * caustic_str * vec3(0.82, 1.05, 1.25);
 
 	ALBEDO    = col;
-	ROUGHNESS = mix(0.12, 0.30, fresnel);
+	ROUGHNESS = mix(0.16, 0.32, fresnel);
 	METALLIC  = 0.0;
 	SPECULAR  = 0.85;
 
-	// BACKLIGHT: Godot multiplies this by the back-face lighting internally,
-	// so it only appears when light hits from the opposite side of the surface.
-	// No manual crest_t modulation needed — the pipeline handles angle dependency.
 	BACKLIGHT = sss_color.rgb * sss_str;
 }
