@@ -161,8 +161,8 @@ void vertex() {
 	disp += _gerstner(wave_d, pn1 * 0.6, wxz, t, tan, bin);
 	disp += _gerstner(wave_e, pn2 * 1.4, wxz, t, tan, bin);
 	disp += _gerstner(wave_f, pn3 * 0.9, wxz, t, tan, bin);
-	disp += _gerstner(wave_g, pn1 * 1.1, wxz, t, tan, bin);
-	disp += _gerstner(wave_h, pn2 * 0.7, wxz, t, tan, bin);
+	// wave_g (2.7 m) and wave_h (1.8 m) are near/below the Nyquist limit of the
+	// inner ring's 0.8 m vertex spacing — they alias as geometry, live in the normal map.
 
 	// Four-scale FBM chop — each scale at a unique frequency, direction and speed
 	// so no single tile scale dominates.
@@ -183,13 +183,17 @@ void vertex() {
 	disp.z += lat.y * chop_amp * 0.8;
 
 	VERTEX  += disp;
-	vec3 geom_n = normalize(cross(bin, tan));
+
+	float normal_flatness = clamp(lod_min_dist / 200.0, 0.0, 1.0);
+	vec3 geom_n = normalize(mix(normalize(cross(bin, tan)), vec3(0.0, 1.0, 0.0), normal_flatness));
+	vec3 geom_t = normalize(mix(normalize(tan),             vec3(1.0, 0.0, 0.0), normal_flatness));
+	vec3 geom_b = normalize(mix(normalize(bin),             vec3(0.0, 0.0, 1.0), normal_flatness));
 	NORMAL   = geom_n;
-	TANGENT  = normalize(tan);
-	BINORMAL = normalize(bin);
+	TANGENT  = geom_t;
+	BINORMAL = geom_b;
 
 	v_wave_y         = disp.y;
-	v_world_xz_t     = vec3(wxz.x, wxz.y, t);
+	v_world_xz_t     = vec3(VERTEX.xz + MODEL_MATRIX[3].xz, t);
 	v_cam_dist       = length(wxz - cam_xz);
 	v_geom_normal_y  = geom_n.y;  // 1.0 = flat, <1 = tilted/steep
 }
@@ -202,14 +206,10 @@ void fragment() {
 	vec2  wxz = v_world_xz_t.xy;
 	float t   = v_world_xz_t.z;
 
-	// Distance LOD for normal detail — high-freq layers alias badly at distance
-	float dist_lod  = smoothstep(15.0, 80.0, v_cam_dist);   // 0=near, 1=far
-	float dist_fade = 1.0 - dist_lod;
-
-	// Scale finite-difference eps with distance: far pixels need coarser normals
-	// or they alias/flicker as the camera moves.
-	float eps = 0.45 + v_cam_dist * 0.04;
-	eps = min(eps, 4.0);
+	// Per-pixel world-space footprint — geometrically correct LOD that doesn't
+	// shift when the camera translates (unlike a camera-distance heuristic).
+	float eps       = clamp(max(fwidth(wxz.x), fwidth(wxz.y)) * 2.0, 0.3, 5.0);
+	float dist_fade = 1.0 - smoothstep(0.4, 2.5, eps);
 
 	// Multi-scale detail using stochastic FBM for the coarse layers (no global period)
 	// and plain FBM for fine layers (high-freq detail tiles fast enough to be invisible).
@@ -222,7 +222,7 @@ void fragment() {
 	float dx = (DETAIL(wxz + vec2(eps, 0.0)) - DETAIL(wxz - vec2(eps, 0.0))) / (2.0 * eps);
 	float dz = (DETAIL(wxz + vec2(0.0, eps)) - DETAIL(wxz - vec2(0.0, eps))) / (2.0 * eps);
 	NORMAL_MAP       = normalize(vec3(-dx, -dz, 1.0)) * 0.5 + 0.5;
-	NORMAL_MAP_DEPTH = detail_strength * (0.3 + dist_fade * 0.7);
+	NORMAL_MAP_DEPTH = detail_strength * (0.5 + dist_fade * 0.5);
 
 	float fresnel = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 3.0);
 	float crest_t = smoothstep(0.38, 0.62, v_wave_y);
@@ -289,7 +289,7 @@ void fragment() {
 	col += caustic * caustic_str * vec3(0.82, 1.05, 1.25);
 
 	ALBEDO    = col;
-	ROUGHNESS = mix(0.04, 0.28, fresnel);
+	ROUGHNESS = mix(0.12, 0.30, fresnel);
 	METALLIC  = 0.0;
 	SPECULAR  = 0.85;
 
