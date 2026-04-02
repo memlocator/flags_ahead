@@ -115,12 +115,19 @@ far_size = 15000.0
 far_subdivs = 150
 steepness = 1.0
 chop_amp = 0.1
+chop_scale = 0.2
 detail_strength = 0.1
-depth_fog_end = 4.0
+clarity = 0.8
+depth_fog_start = 0.1
+depth_fog_end = 2.0
 color_deep = Color(0.04949283, 0.29426005, 0.35247186, 1)
 color_shallow = Color(0.0029358075, 0.20479247, 0.34123835, 1)
+roughness_near = 0.0
+specular_str = 0.7
 sss_color = Color(0, 0.5331359, 0.54881036, 1)
 caustic_str = 0.65
+foam_contact_band = 0.6
+foam_contact_gain = 1.6
 
 [node name="BuildSystem" type="Node3D" parent="." unique_id=196088708]
 script = ExtResource("4_build")

@@ -31,10 +31,19 @@ extends Node3D
 @export var depth_fog_start: float = 0.5  ## Metres below surface where fog begins
 @export var depth_fog_end:   float = 12.0 ## Metres below surface where fully fogged
 
+@export_group("Foam")
+@export var foam_crest:         float = 0.72  ## Wave height fraction where whitecaps begin (0=always, 1=tips only)
+@export var foam_threshold:     float = 1.85  ## Background foam density — lower = more patches (1.0–2.5)
+
 @export_group("Color")
 @export var color_deep:    Color = Color(0.02, 0.18, 0.22, 1.0)  ## Deep-water colour
 @export var color_shallow: Color = Color(0.05, 0.52, 0.38, 1.0)  ## Shallow/grazing colour
 @export var color_foam:    Color = Color(0.87, 0.93, 0.97, 1.0)  ## Whitecap foam colour
+
+@export_group("Specularity")
+@export var roughness_near:  float = 0.16  ## Roughness looking straight down (tight highlights)
+@export var roughness_far:   float = 0.32  ## Roughness at grazing angles (spread highlights)
+@export var specular_str:    float = 0.85  ## Specular intensity
 
 @export_group("SSS")
 @export var sss_str:         float = 1.0    ## Backlit translucency through thin crests
@@ -44,9 +53,8 @@ extends Node3D
 @export var caustic_str:     float = 0.75   ## Fake refracted-sunlight sparkle intensity
 
 @export_group("Foam Contact")
-@export var foam_contact_band: float = 0.6   ## meters above surface to trigger contact foam
-@export var foam_contact_max:  float = 2.0   ## max depth considered for contact foam
-@export var foam_contact_gain: float = 1.6   ## intensity multiplier for contact foam
+@export var foam_contact_band: float = 0.3  ## metres below waterline that gets foam
+@export var foam_contact_gain: float = 0.6  ## intensity of contact foam
 
 const _WAVES: Array[Vector4] = [
 	Vector4( 1.00,  0.00, 0.38, 22.0),
@@ -125,12 +133,16 @@ func _process(delta: float) -> void:
 		m.set_shader_parameter("clarity",          clarity)
 		m.set_shader_parameter("depth_fog_start",   depth_fog_start)
 		m.set_shader_parameter("depth_fog_end",     depth_fog_end)
+		m.set_shader_parameter("foam_crest",        foam_crest)
+		m.set_shader_parameter("foam_threshold",    foam_threshold)
 		m.set_shader_parameter("foam_contact_band", foam_contact_band)
-		m.set_shader_parameter("foam_contact_max",  foam_contact_max)
 		m.set_shader_parameter("foam_contact_gain", foam_contact_gain)
 		m.set_shader_parameter("color_deep",     color_deep)
 		m.set_shader_parameter("color_shallow",  color_shallow)
 		m.set_shader_parameter("color_foam",     color_foam)
+		m.set_shader_parameter("roughness_near", roughness_near)
+		m.set_shader_parameter("roughness_far",  roughness_far)
+		m.set_shader_parameter("specular_str",   specular_str)
 		m.set_shader_parameter("sss_str",        sss_str)
 		m.set_shader_parameter("sss_color",      sss_color)
 		m.set_shader_parameter("caustic_str",    caustic_str)

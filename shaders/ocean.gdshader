@@ -21,11 +21,17 @@ uniform float detail_strength : hint_range(0.0, 2.0) = 0.65;
 uniform vec4  color_deep    : source_color = vec4(0.02, 0.18, 0.22, 1.0);
 uniform vec4  color_shallow : source_color = vec4(0.05, 0.52, 0.38, 1.0);
 uniform vec4  color_foam    : source_color = vec4(0.87, 0.93, 0.97, 1.0);
-// Foam contacts: how far above the surface geometry can be and still spawn foam,
-// and the boost applied at contacts (pillars, hulls, shore).
-uniform float foam_contact_band : hint_range(0.0, 2.0) = 0.6;
-uniform float foam_contact_max  : hint_range(0.0, 5.0) = 2.0;
-uniform float foam_contact_gain : hint_range(0.0, 3.0) = 1.6;
+// Crest foam: fraction of peak wave height where whitecaps begin (0=always, 1=tips only).
+uniform float foam_crest        : hint_range(0.0, 1.0) = 0.72;
+// Background foam: density of the stochastic patch field (lower = more foam).
+uniform float foam_threshold    : hint_range(1.0, 2.5) = 1.85;
+// Contact foam: band width (metres) around the waterline, and intensity.
+uniform float foam_contact_band : hint_range(0.0, 2.0) = 0.3;
+uniform float foam_contact_gain : hint_range(0.0, 2.0) = 0.6;
+
+uniform float roughness_near  : hint_range(0.0, 1.0) = 0.16;  // roughness when looking straight down
+uniform float roughness_far   : hint_range(0.0, 1.0) = 0.32;  // roughness at grazing angles
+uniform float specular_str    : hint_range(0.0, 1.0) = 0.85;  // specular intensity
 
 // SSS — backlit translucency through thin wave crests
 uniform vec4  sss_color : source_color = vec4(0.04, 0.68, 0.35, 1.0);
@@ -331,25 +337,28 @@ void fragment() {
 	float wave_ao = smoothstep(-0.65, 0.55, v_wave_y);
 	col *= mix(0.72, 1.0, wave_ao);
 
-	// Foam: purely stochastic — NOT gated by Gerstner wave height.
-	// wave_gate was the cause of the grid: it filtered the stochastic field
-	// through the periodic Gerstner maxima, re-introducing the period.
-	// Instead, drive foam entirely from two stochastic FBM fields at different
-	// cell scales; their product is sparse and has zero repeating period.
-	// _sfbm with bare wxz input: cell_scale 0.018 → cells ~55m wide — correct scale.
-	// FBM values [0, ~0.94], mean ~0.47; product mean ~0.22, *4 mean ~0.88.
-	// Threshold 1.85–2.15 selects the top ~5–8% of the distribution.
-	float fn_a       = _sfbm(wxz + vec2( t*0.022,  t*0.016),              0.018);
-	float fn_b       = _sfbm(wxz + vec2(-t*0.019,  t*0.025) + vec2(6.3, 2.1), 0.028);
-	float foam_field = smoothstep(1.85, 2.15, fn_a * fn_b * 4.0);
-	float steep_f    = smoothstep(0.90, 0.70, v_geom_normal_y);
-	// Contact foam: trigger near geometry that intersects the water surface.
-	float contact_depth = clamp(world_y - surf_y, 0.0, foam_contact_max);
-	float contact       = 1.0 - smoothstep(0.0, foam_contact_band, contact_depth);
-	float base_foam     = foam_field * (0.30 + steep_f * 0.70);
-	// Contact adds where noise exists; limited strength to avoid full-white.
-	float contact_term  = contact * foam_field * foam_contact_gain * 0.5;
-	float foam          = base_foam + contact_term;
+	// Stochastic background foam — sparse product of two sfbm fields.
+	// Scale coords by wave_amp so foam patches stay proportional to wave size.
+	vec2  fwxz     = wxz / max(wave_amp, 1.0);
+	float fn_a     = _sfbm(fwxz + vec2( t*0.022,  t*0.016),              0.018);
+	float fn_b     = _sfbm(fwxz + vec2(-t*0.019,  t*0.025) + vec2(6.3, 2.1), 0.028);
+	// Background foam only appears near crests — multiply by a wave height ramp
+	// so patches don't show in troughs.
+	float peak        = 0.99 * max(wave_amp, 1.0);
+	float crest_bias  = smoothstep(-0.2 * peak, 0.6 * peak, v_wave_y);
+	float foam_field  = smoothstep(foam_threshold, foam_threshold + 0.3, fn_a * fn_b * 4.0) * crest_bias;
+
+	// Crest foam — driven by actual wave height, scales with wave_amp.
+	float crest_foam  = smoothstep(foam_crest * peak, peak, v_wave_y) * 0.65;
+
+	// Contact foam — thin band right at the waterline of any submerged geometry.
+	// Only fires when geometry is below the surface (world_y < surf_y) and
+	// within foam_contact_band metres of it.
+	float contact_foam = (world_y < surf_y)
+		? (1.0 - smoothstep(0.0, foam_contact_band, surf_y - world_y)) * foam_contact_gain
+		: 0.0;
+
+	float foam = max(foam_field, crest_foam) + contact_foam;
 	col = mix(col, color_foam.rgb, clamp(foam, 0.0, 1.0));
 
 	// Fake caustics — same sparse-product trick, finer spatial scale (~3 m features).
@@ -363,9 +372,9 @@ void fragment() {
 	col += caustic * caustic_str * vec3(0.82, 1.05, 1.25);
 
 	ALBEDO    = col;
-	ROUGHNESS = mix(0.16, 0.32, fresnel);
+	ROUGHNESS = mix(roughness_near, roughness_far, fresnel);
 	METALLIC  = 0.0;
-	SPECULAR  = 0.85;
+	SPECULAR  = specular_str;
 
 	BACKLIGHT = sss_color.rgb * sss_str;
 }
