@@ -9,6 +9,7 @@
 [ext_resource type="PackedScene" uid="uid://clh3bx7tu52ml" path="res://assets/characters/character.glb" id="7_char"]
 [ext_resource type="Script" uid="uid://0301q3mp5tw3" path="res://scripts/ship_skeleton_interactable.gd" id="8_interactable"]
 [ext_resource type="Resource" uid="uid://dfp4woudtokyd" path="res://assets/ships/sloop.tres" id="9_sloop"]
+[ext_resource type="Script" uid="uid://drrbfcaqxjeol" path="res://scripts/ocean.gd" id="10_ocean"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_env"]
 
@@ -36,6 +37,9 @@ albedo_color = Color(0.25, 0.35, 0.2, 1)
 radius = 0.3
 height = 1.8
 
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_vtaks"]
+albedo_color = Color(0.5163397, 0.44823778, 0.27276784, 1)
+
 [node name="root" type="Node3D" unique_id=1653196456]
 script = ExtResource("1_game")
 
@@ -49,12 +53,13 @@ light_angular_distance = 0.5
 shadow_enabled = true
 
 [node name="Ground" type="StaticBody3D" parent="." unique_id=786087831]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.25, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -3.25, 0)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Ground" unique_id=2049438336]
 shape = SubResource("BoxShape3D_ground")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Ground" unique_id=1231672845]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -9.536743e-07)
 mesh = SubResource("BoxMesh_ground")
 surface_material_override/0 = SubResource("Mat_ground")
 
@@ -91,13 +96,28 @@ config = ExtResource("9_sloop")
 script = ExtResource("8_interactable")
 
 [node name="ShipRoot" type="RigidBody3D" parent="." unique_id=614811410]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -23.642042, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -42.97306, -8.3742485, 0)
 freeze = true
 
 [node name="KeelGroup" type="Node3D" parent="ShipRoot" unique_id=1531864649]
 script = ExtResource("3_skel")
 
 [node name="PlacedPieces" type="Node3D" parent="ShipRoot" unique_id=1577087030]
+
+[node name="Ocean" type="Node3D" parent="." unique_id=321654987]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -5.172516, 0)
+script = ExtResource("10_ocean")
+inner_radius = 600.0
+inner_subdivs = 1500
+outer_subdivs = 150
+far_size = 15000.0
+far_subdivs = 150
+steepness = 1.0
+depth_fog_end = 4.0
+foam_height = 0.46
+color_deep = Color(0.04949283, 0.29426005, 0.35247186, 1)
+color_shallow = Color(0.007843138, 0.33333334, 0.5372549, 1)
+sss_color = Color(0, 0.5331359, 0.54881036, 1)
 
 [node name="BuildSystem" type="Node3D" parent="." unique_id=196088708]
 script = ExtResource("4_build")
@@ -120,3 +140,8 @@ offset_top = 10.0
 offset_right = 920.0
 offset_bottom = 60.0
 text = "Loading..."
+
+[node name="Gound" type="MeshInstance3D" parent="." unique_id=240166657]
+transform = Transform3D(300, 0, 0, 0, 1, 0, 0, 0, 300, -81.28996, -9.390339, -0.045967102)
+mesh = SubResource("BoxMesh_ground")
+surface_material_override/0 = SubResource("StandardMaterial3D_vtaks")

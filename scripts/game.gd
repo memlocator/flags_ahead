@@ -12,6 +12,7 @@ extends Node3D
 @onready var ghost_mesh_node     := $BuildSystem/BuildPreview/PivotNode/GhostMesh as Node3D
 @onready var toolbar             := $Toolbar
 @onready var hud_label           := $HUD/Label as Label
+@onready var ocean               := $Ocean
 
 var _ship_editor: ShipEditor
 
@@ -40,6 +41,7 @@ func _ready() -> void:
 	build_system.skeletons_root      = skeletons_root
 
 	toolbar.build_system = build_system
+	ocean.follow_target  = camera_pivot
 
 	build_system.piece_added.connect(_on_piece_added)
 	build_system.piece_destroyed.connect(_on_piece_destroyed)
