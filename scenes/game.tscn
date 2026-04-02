@@ -160,7 +160,8 @@ inner_subdivs = 1500
 outer_subdivs = 150
 far_size = 15000.0
 far_subdivs = 150
-steepness = 1.0
+wave_amp = 0.5
+steepness = 0.1
 chop_amp = 0.1
 chop_scale = 0.2
 detail_strength = 0.1
@@ -173,10 +174,9 @@ roughness_near = 0.0
 specular_str = 0.7
 sss_color = Color(0, 0.5331359, 0.54881036, 1)
 caustic_str = 0.65
-macro_str = 0.0
+macro_str = 1.0
 foam_contact_band = null
 foam_contact_gain = null
-foam_contact_spread = null
 underwater_env = ExtResource("11_kvuet")
 underwater_fog_density = 0.5
 
@@ -203,6 +203,6 @@ offset_bottom = 60.0
 text = "Loading..."
 
 [node name="Gound" type="MeshInstance3D" parent="." unique_id=240166657]
-transform = Transform3D(300, 0, 0, 0, 1, 0, 0, 0, 300, -81.28996, -8.792757, -0.045967102)
+transform = Transform3D(300, 0, 0, 0, 1, 0, 0, 0, 300, -81.28996, -14.169761, -0.045967102)
 mesh = SubResource("BoxMesh_ground")
 surface_material_override/0 = SubResource("StandardMaterial3D_vtaks")

@@ -193,7 +193,7 @@ func get_wave_height(world_x: float, world_z: float) -> float:
 func _sample_wave_height(xz: Vector2, t: float) -> float:
 	var y := 0.0
 	for wave: Vector4 in _WAVES:
-		y += _gerstner_y(wave, xz, t) * wave_amp
+		y += _gerstner_y(wave, xz, t)
 	return y
 
 
@@ -223,7 +223,7 @@ func _apply_underwater_fx(under: bool) -> void:
 
 func _gerstner_y(wave: Vector4, xz: Vector2, t: float) -> float:
 	var d := Vector2(wave.x, wave.y).normalized()
-	var k := TAU / (wave.w * wave_amp)
+	var k := TAU / wave.w
 	var c := sqrt(9.8 / k)
 	var f := k * (d.dot(xz) - c * t)
 	return wave.z * wave_amp * sin(f)

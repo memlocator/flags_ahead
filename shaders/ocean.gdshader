@@ -11,10 +11,10 @@ uniform vec4 wave_f = vec4(-0.81,  0.59, 0.04,  3.8);
 uniform vec4 wave_g = vec4( 0.31, -0.95, 0.03,  2.7);
 uniform vec4 wave_h = vec4( 0.93,  0.37, 0.02,  1.8);
 
-uniform float wave_amp        : hint_range(0.0, 3.0) = 1.0;
+uniform float wave_amp        : hint_range(0.0, 4.0) = 1.0;
 uniform float steepness       : hint_range(0.0, 1.0) = 0.38;
 uniform float wave_time       = 0.0;
-uniform float chop_amp        : hint_range(0.0, 1.0) = 0.10;
+uniform float chop_amp        : hint_range(0.0, 2.0) = 0.10;
 uniform float chop_scale      : hint_range(0.25, 4.0) = 1.0;
 uniform float detail_strength : hint_range(0.0, 2.0) = 0.65;
 
@@ -185,9 +185,9 @@ vec2 _gabor_slope(vec2 p, vec2 dir, float t,
 vec3 _gerstner(vec4 wave, float phase, vec2 xz, float t,
                inout vec3 tan, inout vec3 bin) {
 	vec2  d = normalize(wave.xy);
-	// Scale both wavelength and amplitude by wave_amp — keeps steepness ratio constant
-	// so Q*a*k is independent of wave_amp and the wave never folds regardless of scale.
-	float k = 6.28318 / (wave.w * wave_amp);
+	// Only amplitude scales with wave_amp — wavelength stays fixed so waves get steeper, not just bigger.
+	// Folding limit: steepness * wave_amp * sum(a_i * k_i) must stay below 1. Safe up to ~wave_amp 4.
+	float k = 6.28318 / wave.w;
 	float c = sqrt(9.8 / k);
 	float q = steepness;
 	float a = wave.z * wave_amp;
@@ -210,7 +210,7 @@ vec3 _gerstner(vec4 wave, float phase, vec2 xz, float t,
 // gradient discontinuities (adding a smooth value to f keeps cos smooth).
 vec2 _wave_slope(vec4 wave, vec2 xz, float t, float phase_offset) {
 	vec2  d = normalize(wave.xy);
-	float k = TAU / (wave.w * wave_amp);
+	float k = TAU / wave.w;
 	float c = sqrt(9.8 / k);
 	float a = wave.z * wave_amp;
 	float f = k * dot(d, xz) - k * c * t + phase_offset;
@@ -348,14 +348,15 @@ void fragment() {
 	float crest_bias  = smoothstep(-0.2 * peak, 0.6 * peak, v_wave_y);
 	float foam_field  = smoothstep(foam_threshold, foam_threshold + 0.3, fn_a * fn_b * 4.0) * crest_bias;
 
-	// Crest foam — driven by actual wave height, scales with wave_amp.
-	float crest_foam  = smoothstep(foam_crest * peak, peak, v_wave_y) * 0.65;
+	float cn = _fbm(fwxz * 4.5 + vec2(t * 0.06, -t * 0.04));
+
+	// cn offsets v_wave_y per-fragment so the foam edge is noise-broken rather than a vertex-grid isocontour.
+	float crest_foam = smoothstep(foam_crest * peak, peak, v_wave_y + (cn * 2.0 - 1.0) * peak * 0.3) * 0.65;
 
 	float contact_base = (world_y < surf_y)
 		? (1.0 - smoothstep(0.0, foam_contact_band, surf_y - world_y))
 		: 0.0;
 	// Lower bound shrinks as contact_base grows so the ring is dense at the hull and sparse at the edge.
-	float cn = _fbm(fwxz * 4.5 + vec2(t * 0.06, -t * 0.04));
 	float contact_foam = contact_base * smoothstep(0.35 - contact_base * 0.35, 0.70, cn) * foam_contact_gain;
 
 	float foam = max(foam_field, crest_foam + contact_foam);
