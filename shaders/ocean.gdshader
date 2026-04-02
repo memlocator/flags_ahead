@@ -1,5 +1,5 @@
 shader_type spatial;
-render_mode blend_mix, depth_draw_opaque, cull_back, diffuse_burley, specular_schlick_ggx;
+render_mode blend_mix, depth_draw_always, cull_back, diffuse_burley, specular_schlick_ggx;
 
 // ── 8 Gerstner waves: (dir_x, dir_z, amplitude, wavelength) ──────────────────
 uniform vec4 wave_a = vec4( 1.00,  0.00, 0.38, 22.0);
@@ -11,15 +11,21 @@ uniform vec4 wave_f = vec4(-0.81,  0.59, 0.04,  3.8);
 uniform vec4 wave_g = vec4( 0.31, -0.95, 0.03,  2.7);
 uniform vec4 wave_h = vec4( 0.93,  0.37, 0.02,  1.8);
 
+uniform float wave_amp        : hint_range(0.0, 3.0) = 1.0;
 uniform float steepness       : hint_range(0.0, 1.0) = 0.38;
 uniform float wave_time       = 0.0;
 uniform float chop_amp        : hint_range(0.0, 1.0) = 0.10;
+uniform float chop_scale      : hint_range(0.25, 4.0) = 1.0;
 uniform float detail_strength : hint_range(0.0, 2.0) = 0.65;
 
 uniform vec4  color_deep    : source_color = vec4(0.02, 0.18, 0.22, 1.0);
 uniform vec4  color_shallow : source_color = vec4(0.05, 0.52, 0.38, 1.0);
 uniform vec4  color_foam    : source_color = vec4(0.87, 0.93, 0.97, 1.0);
-uniform float foam_height   : hint_range(0.0, 2.0) = 0.58;  // ~65% of max wave height
+// Foam contacts: how far above the surface geometry can be and still spawn foam,
+// and the boost applied at contacts (pillars, hulls, shore).
+uniform float foam_contact_band : hint_range(0.0, 2.0) = 0.6;
+uniform float foam_contact_max  : hint_range(0.0, 5.0) = 2.0;
+uniform float foam_contact_gain : hint_range(0.0, 3.0) = 1.6;
 
 // SSS — backlit translucency through thin wave crests
 uniform vec4  sss_color : source_color = vec4(0.04, 0.68, 0.35, 1.0);
@@ -173,10 +179,12 @@ vec2 _gabor_slope(vec2 p, vec2 dir, float t,
 vec3 _gerstner(vec4 wave, float phase, vec2 xz, float t,
                inout vec3 tan, inout vec3 bin) {
 	vec2  d = normalize(wave.xy);
-	float k = 6.28318 / wave.w;
+	// Scale both wavelength and amplitude by wave_amp — keeps steepness ratio constant
+	// so Q*a*k is independent of wave_amp and the wave never folds regardless of scale.
+	float k = 6.28318 / (wave.w * wave_amp);
 	float c = sqrt(9.8 / k);
-	float a = wave.z;
 	float q = steepness;
+	float a = wave.z * wave_amp;
 	float f = k * (dot(d, xz) - c * t) + phase;
 
 	tan += vec3(-q * d.x * d.x * a * k * sin(f),
@@ -196,10 +204,11 @@ vec3 _gerstner(vec4 wave, float phase, vec2 xz, float t,
 // gradient discontinuities (adding a smooth value to f keeps cos smooth).
 vec2 _wave_slope(vec4 wave, vec2 xz, float t, float phase_offset) {
 	vec2  d = normalize(wave.xy);
-	float k = TAU / wave.w;
+	float k = TAU / (wave.w * wave_amp);
 	float c = sqrt(9.8 / k);
+	float a = wave.z * wave_amp;
 	float f = k * dot(d, xz) - k * c * t + phase_offset;
-	return d * (wave.z * k * cos(f));
+	return d * (a * k * cos(f));
 }
 
 
@@ -274,8 +283,8 @@ void fragment() {
 	// Gabor wave-packet chop — stochastic Gabor kernels, no cell boundary strips.
 	// Layer 1: medium chop — ~14 m crests, moves with primary swell direction.
 	// Layer 2: fine chop  — ~7 m crests, secondary direction, fades at distance.
-	slope += _gabor_slope(wxz, normalize(wave_a.xy), t, 0.40, 3.0, 3.0, 1.5) * chop_amp * 5.0;
-	slope += _gabor_slope(wxz, normalize(wave_b.xy), t, 0.85, 1.5, 2.5, 2.2) * chop_amp * 4.0 * dist_fade;
+	slope += _gabor_slope(wxz, normalize(wave_a.xy), t, 0.40/chop_scale, 3.0*chop_scale, 3.0, 1.5) * chop_amp * 5.0;
+	slope += _gabor_slope(wxz, normalize(wave_b.xy), t, 0.85/chop_scale, 1.5*chop_scale, 2.5, 2.2) * chop_amp * 4.0 * dist_fade;
 
 	float nm_depth   = detail_strength;
 	NORMAL_MAP       = normalize(vec3(-slope.x, -slope.y, 1.0)) * 0.5 + 0.5;
@@ -334,7 +343,13 @@ void fragment() {
 	float fn_b       = _sfbm(wxz + vec2(-t*0.019,  t*0.025) + vec2(6.3, 2.1), 0.028);
 	float foam_field = smoothstep(1.85, 2.15, fn_a * fn_b * 4.0);
 	float steep_f    = smoothstep(0.90, 0.70, v_geom_normal_y);
-	float foam       = foam_field * (0.3 + steep_f * 0.7);
+	// Contact foam: trigger near geometry that intersects the water surface.
+	float contact_depth = clamp(world_y - surf_y, 0.0, foam_contact_max);
+	float contact       = 1.0 - smoothstep(0.0, foam_contact_band, contact_depth);
+	float base_foam     = foam_field * (0.30 + steep_f * 0.70);
+	// Contact adds where noise exists; limited strength to avoid full-white.
+	float contact_term  = contact * foam_field * foam_contact_gain * 0.5;
+	float foam          = base_foam + contact_term;
 	col = mix(col, color_foam.rgb, clamp(foam, 0.0, 1.0));
 
 	// Fake caustics — same sparse-product trick, finer spatial scale (~3 m features).

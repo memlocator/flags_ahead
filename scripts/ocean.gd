@@ -19,8 +19,10 @@ extends Node3D
 @export var follow_target: Node3D = null
 
 @export_group("Waves")
+@export var wave_amp:        float = 1.0    ## Global wave height multiplier (1=normal, 2=storm)
 @export var steepness:       float = 0.38   ## Gerstner peak sharpness (0=sine, 1=peaked)
-@export var chop_amp:        float = 0.38   ## Small-scale FBM chop amplitude
+@export var chop_amp:        float = 0.38   ## Chop amplitude
+@export var chop_scale:      float = 1.0    ## Chop feature size (1=default, 2=twice as large)
 
 @export_group("Surface Detail")
 @export var detail_strength: float = 0.65   ## Normal map intensity
@@ -28,9 +30,6 @@ extends Node3D
 @export var clarity:         float = 0.45   ## 0=opaque/deep  1=clear/shallow
 @export var depth_fog_start: float = 0.5  ## Metres below surface where fog begins
 @export var depth_fog_end:   float = 12.0 ## Metres below surface where fully fogged
-
-@export_group("Foam")
-@export var foam_height:     float = 0.58   ## Minimum wave height to show foam
 
 @export_group("Color")
 @export var color_deep:    Color = Color(0.02, 0.18, 0.22, 1.0)  ## Deep-water colour
@@ -43,6 +42,11 @@ extends Node3D
 
 @export_group("Caustics")
 @export var caustic_str:     float = 0.75   ## Fake refracted-sunlight sparkle intensity
+
+@export_group("Foam Contact")
+@export var foam_contact_band: float = 0.6   ## meters above surface to trigger contact foam
+@export var foam_contact_max:  float = 2.0   ## max depth considered for contact foam
+@export var foam_contact_gain: float = 1.6   ## intensity multiplier for contact foam
 
 const _WAVES: Array[Vector4] = [
 	Vector4( 1.00,  0.00, 0.38, 22.0),
@@ -112,14 +116,18 @@ func _process(delta: float) -> void:
 	var t: float = (Time.get_ticks_msec() / 1000.0) if Engine.is_editor_hint() else _time * time_scale
 	for m: ShaderMaterial in _materials:
 		m.set_shader_parameter("wave_time",      t)
+		m.set_shader_parameter("wave_amp",       wave_amp)
 		m.set_shader_parameter("steepness",      steepness)
 		m.set_shader_parameter("chop_amp",       chop_amp)
+		m.set_shader_parameter("chop_scale",     chop_scale)
 		m.set_shader_parameter("detail_strength",detail_strength)
 		m.set_shader_parameter("refraction_str", refraction_str)
 		m.set_shader_parameter("clarity",          clarity)
 		m.set_shader_parameter("depth_fog_start",   depth_fog_start)
 		m.set_shader_parameter("depth_fog_end",     depth_fog_end)
-		m.set_shader_parameter("foam_height",    foam_height)
+		m.set_shader_parameter("foam_contact_band", foam_contact_band)
+		m.set_shader_parameter("foam_contact_max",  foam_contact_max)
+		m.set_shader_parameter("foam_contact_gain", foam_contact_gain)
 		m.set_shader_parameter("color_deep",     color_deep)
 		m.set_shader_parameter("color_shallow",  color_shallow)
 		m.set_shader_parameter("color_foam",     color_foam)
@@ -145,7 +153,7 @@ func get_wave_height(world_x: float, world_z: float) -> float:
 
 func _gerstner_y(wave: Vector4, xz: Vector2, t: float) -> float:
 	var d := Vector2(wave.x, wave.y).normalized()
-	var k := TAU / wave.w
+	var k := TAU / (wave.w * wave_amp)
 	var c := sqrt(9.8 / k)
 	var f := k * (d.dot(xz) - c * t)
-	return wave.z * sin(f)
+	return wave.z * wave_amp * sin(f)
