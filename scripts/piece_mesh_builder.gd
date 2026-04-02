@@ -33,6 +33,7 @@ static func _ensure_materials() -> void:
 		_ghost_mat.albedo_color = Color(0.4, 0.8, 1.0, 0.45)
 		_ghost_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		_ghost_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+		_ghost_mat.render_priority = 3  # above ocean rings (0, 1, 2)
 
 
 static func _box_mi(size: Vector3, offset: Vector3, mat: Material) -> MeshInstance3D:

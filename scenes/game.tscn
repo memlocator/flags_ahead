@@ -111,32 +111,34 @@ config = ExtResource("9_sloop")
 script = ExtResource("8_interactable")
 
 [node name="BuoyancyBody" type="Node3D" parent="SkeletonsRoot/Sloop" unique_id=112233447]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.37103522, 0)
 script = ExtResource("11_buoyancy")
-buoyancy_strength = 65.0
+buoyancy_strength = 90.0
 damping = 1.0
+depth_exponent = 4.0
 
 [node name="SensorBowPort" type="Marker3D" parent="SkeletonsRoot/Sloop/BuoyancyBody" unique_id=112233450]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.6560817, -1.2999992)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.4089216, -1.2999992)
 script = ExtResource("12_sensor")
 
 [node name="SensorBowStarboard" type="Marker3D" parent="SkeletonsRoot/Sloop/BuoyancyBody" unique_id=112233451]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.6560817, 1.2999992)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.4089216, 1.2999992)
 script = ExtResource("12_sensor")
 
 [node name="SensorMidPort" type="Marker3D" parent="SkeletonsRoot/Sloop/BuoyancyBody" unique_id=112233452]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0.6560817, -1.5)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0.4089216, -1.5)
 script = ExtResource("12_sensor")
 
 [node name="SensorMidStarboard" type="Marker3D" parent="SkeletonsRoot/Sloop/BuoyancyBody" unique_id=112233453]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0.6560817, 1.5)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0.4089216, 1.5)
 script = ExtResource("12_sensor")
 
 [node name="SensorSternPort" type="Marker3D" parent="SkeletonsRoot/Sloop/BuoyancyBody" unique_id=112233454]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.5, 0.6560817, -1.3999958)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.5, 0.4089216, -1.3999901)
 script = ExtResource("12_sensor")
 
 [node name="SensorSternStarboard" type="Marker3D" parent="SkeletonsRoot/Sloop/BuoyancyBody" unique_id=112233455]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.5, 0.6560817, 1.4000015)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.5, 0.4089216, 1.4000015)
 script = ExtResource("12_sensor")
 
 [node name="ShipRoot" type="RigidBody3D" parent="." unique_id=614811410]

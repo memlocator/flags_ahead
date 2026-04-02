@@ -8,6 +8,9 @@ extends Node3D
 @export var ocean: Ocean
 @export var buoyancy_strength: float = 25.0
 @export var damping: float = 3.0
+## Force grows as depth^exponent. 1.0 = linear, 2.0 = quadratic (default).
+## Higher values resist full submersion more strongly.
+@export_range(1.0, 4.0, 0.1) var depth_exponent: float = 2.0
 
 var _sensors: Array[BuoyancySensor] = []
 
@@ -38,7 +41,7 @@ func _physics_process(_delta: float) -> void:
 
 		var force := Vector3.ZERO
 		if depth > 0.0:
-			force += Vector3.UP * buoyancy_strength * depth * body.mass / n
+			force += Vector3.UP * buoyancy_strength * pow(depth, depth_exponent) * body.mass / n
 		# Damp vertical motion within 2 m of the surface so the ship tracks waves
 		# instead of free-falling through troughs
 		if absf(depth) < 2.0:

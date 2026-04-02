@@ -21,6 +21,8 @@ var rot_axis_index: int = 0
 var placed_pieces: Array[ShipPiece] = []
 var graph := StructuralGraph.new()
 
+var _last_hit_skel: ShipSkeleton = null
+
 # Symmetry — reflects placements across a plane defined by origin + normal
 var symmetry_enabled: bool = false
 var snapping_enabled: bool = true
@@ -185,6 +187,7 @@ func _physics_process(delta: float) -> void:
 
 	# Keep symmetry plane aligned to whatever skeleton we're hovering
 	var hit_skel := BuildUtils.find_ancestor(result.collider, ShipSkeleton) as ShipSkeleton
+	_last_hit_skel = hit_skel
 	if hit_skel:
 		symmetry_origin = hit_skel.global_position
 		symmetry_normal = hit_skel.global_transform.basis.z.normalized()
@@ -384,7 +387,7 @@ func _process_hull_panel(result: Dictionary) -> void:
 
 	# Ghost sits at the skeleton origin; mesh verts are already in skeleton local space
 	ghost_pivot.global_position = skel.global_position
-	ghost_pivot.basis           = skel.basis
+	ghost_pivot.global_basis    = skel.global_basis
 	ghost_pivot.visible         = true
 	ghost_mesh_node.position    = Vector3.ZERO
 	ghost_mesh_node.basis       = Basis.IDENTITY
@@ -420,9 +423,9 @@ func _place_hull_panel() -> void:
 	var cs := CollisionShape3D.new()
 	cs.shape = PieceMeshBuilder.hull_panel_convex(_hull_panel_pts_a, _hull_panel_pts_b)
 	piece.add_child(cs)
-	placed_pieces_node.add_child(piece)
+	_container_for(_hull_panel_skel).add_child(piece)
 	piece.global_position = _hull_panel_skel.global_position
-	piece.basis           = _hull_panel_skel.basis
+	piece.global_basis    = _hull_panel_skel.global_basis
 	placed_pieces.append(piece)
 	var space := get_world_3d().direct_space_state
 	graph.add_piece(piece, space)
@@ -483,7 +486,7 @@ func _process_deck_panel(result: Dictionary) -> void:
 		)
 
 	ghost_pivot.global_position = skel.global_position
-	ghost_pivot.basis           = skel.basis
+	ghost_pivot.global_basis    = skel.global_basis
 	ghost_pivot.visible         = true
 	ghost_mesh_node.position    = Vector3.ZERO
 	ghost_mesh_node.basis       = Basis.IDENTITY
@@ -518,9 +521,9 @@ func _place_deck_panel() -> void:
 	var cs := CollisionShape3D.new()
 	cs.shape = PieceMeshBuilder.hull_panel_convex(_deck_panel_pts_a, _deck_panel_pts_b)
 	piece.add_child(cs)
-	placed_pieces_node.add_child(piece)
+	_container_for(_deck_panel_skel).add_child(piece)
 	piece.global_position = _deck_panel_skel.global_position
-	piece.basis           = _deck_panel_skel.basis
+	piece.global_basis    = _deck_panel_skel.global_basis
 	placed_pieces.append(piece)
 	var space := get_world_3d().direct_space_state
 	graph.add_piece(piece, space)
@@ -547,11 +550,26 @@ func _spawn_piece(type: StringName, pos: Vector3, piece_basis: Basis) -> ShipPie
 	var piece := ShipPiece.new()
 	piece.setup(type)
 	piece.add_child(PieceMeshBuilder.build_piece(type))
-	placed_pieces_node.add_child(piece)
+	_container_for(_last_hit_skel).add_child(piece)
 	piece.global_position = pos
 	piece.basis = piece_basis
 	placed_pieces.append(piece)
 	return piece
+
+
+## Returns the PlacedPieces node of the floating ship containing skel,
+## or placed_pieces_node (the default ground container) if none found.
+func _container_for(skel: ShipSkeleton) -> Node3D:
+	if not skel:
+		return placed_pieces_node
+	var n := skel.get_parent()
+	while n:
+		if n is RigidBody3D and not (n as RigidBody3D).freeze:
+			var pp := n.find_child("PlacedPieces", false, false) as Node3D
+			if pp:
+				return pp
+		n = n.get_parent()
+	return placed_pieces_node
 
 
 func _remove_piece_at_cursor() -> void:
