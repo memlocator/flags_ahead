@@ -52,6 +52,14 @@ extends Node3D
 @export_group("Caustics")
 @export var caustic_str:     float = 0.75   ## Fake refracted-sunlight sparkle intensity
 
+@export_group("Macro Variation")
+@export var macro_str:       float = 0.55   ## Large-scale (~300–800 m) brightness patches — breaks long-range tiling
+
+@export_group("Underwater FX")
+@export var underwater_env: Environment = null ## Optional environment to apply when camera is underwater
+@export var underwater_fog_density: float = 0.0 ## If >0, override env fog density while underwater
+@export var underwater_fog_color: Color = Color(0.08, 0.2, 0.3) ## Fog color override underwater
+
 @export_group("Foam Contact")
 @export var foam_contact_band: float = 0.3  ## metres below waterline that gets foam
 @export var foam_contact_gain: float = 0.6  ## intensity of contact foam
@@ -69,6 +77,8 @@ const _WAVES: Array[Vector4] = [
 
 var _time:      float = 0.0
 var _materials: Array[ShaderMaterial] = []
+var _last_underwater: bool = false
+var _orig_cam_env: Environment = null
 
 
 func _ready() -> void:
@@ -77,6 +87,10 @@ func _ready() -> void:
 		return
 
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	# Cache the camera environment on first run so we can restore it.
+	var cam := get_viewport().get_camera_3d()
+	if cam:
+		_orig_cam_env = cam.environment
 
 	var shader := load("res://shaders/ocean.gdshader") as Shader
 	# Render priority: far=0, outer=1, inner=2 — inner renders last so its
@@ -122,6 +136,17 @@ func _process(delta: float) -> void:
 
 	# In the editor, drive time from a monotonic clock so the ocean animates in the viewport.
 	var t: float = (Time.get_ticks_msec() / 1000.0) if Engine.is_editor_hint() else _time * time_scale
+	var cam := get_viewport().get_camera_3d()
+	var is_underwater := false
+	if cam:
+		var surf_y := global_position.y + _sample_wave_height(Vector2(cam.global_position.x, cam.global_position.z), t)
+		is_underwater = cam.global_position.y < surf_y - 0.2  # small tolerance to avoid flicker at surface
+		if is_underwater != _last_underwater:
+			print("Ocean is_underwater=", is_underwater, " cam_y=", cam.global_position.y, " surf_y=", surf_y)
+			_last_underwater = is_underwater
+			_apply_underwater_fx(is_underwater)
+	
+
 	for m: ShaderMaterial in _materials:
 		m.set_shader_parameter("wave_time",      t)
 		m.set_shader_parameter("wave_amp",       wave_amp)
@@ -137,6 +162,7 @@ func _process(delta: float) -> void:
 		m.set_shader_parameter("foam_threshold",    foam_threshold)
 		m.set_shader_parameter("foam_contact_band", foam_contact_band)
 		m.set_shader_parameter("foam_contact_gain", foam_contact_gain)
+		m.set_shader_parameter("is_underwater", is_underwater)
 		m.set_shader_parameter("color_deep",     color_deep)
 		m.set_shader_parameter("color_shallow",  color_shallow)
 		m.set_shader_parameter("color_foam",     color_foam)
@@ -146,6 +172,7 @@ func _process(delta: float) -> void:
 		m.set_shader_parameter("sss_str",        sss_str)
 		m.set_shader_parameter("sss_color",      sss_color)
 		m.set_shader_parameter("caustic_str",    caustic_str)
+		m.set_shader_parameter("macro_str",      macro_str)
 
 	if follow_target and not Engine.is_editor_hint():
 		global_position.x = follow_target.global_position.x
@@ -155,12 +182,38 @@ func _process(delta: float) -> void:
 # ── Public API ────────────────────────────────────────────────────────────────
 
 func get_wave_height(world_x: float, world_z: float) -> float:
-	var xz := Vector2(world_x, world_z)
-	var t  := _time * time_scale
-	var y  := 0.0
+	return _sample_wave_height(Vector2(world_x, world_z), _time * time_scale)
+
+
+func _sample_wave_height(xz: Vector2, t: float) -> float:
+	var y := 0.0
 	for wave: Vector4 in _WAVES:
-		y += _gerstner_y(wave, xz, t)
+		y += _gerstner_y(wave, xz, t) * wave_amp
 	return y
+
+
+func _apply_underwater_fx(under: bool) -> void:
+	var cam := get_viewport().get_camera_3d()
+	if cam == null:
+		return
+
+	if under:
+		if underwater_env:
+			cam.environment = underwater_env
+		elif underwater_fog_density > 0.0:
+			var env: Environment = cam.environment
+			if env == null and _orig_cam_env:
+				env = _orig_cam_env
+			if env:
+				env = env.duplicate() as Environment
+			else:
+				env = Environment.new()
+			env.fog_enabled = true
+			env.fog_density = underwater_fog_density
+			env.fog_color = underwater_fog_color
+			cam.environment = env
+	else:
+		cam.environment = _orig_cam_env
 
 
 func _gerstner_y(wave: Vector4, xz: Vector2, t: float) -> float:

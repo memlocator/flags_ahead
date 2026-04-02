@@ -1,5 +1,5 @@
 shader_type spatial;
-render_mode blend_mix, depth_draw_always, cull_back, diffuse_burley, specular_schlick_ggx;
+render_mode blend_mix, depth_draw_always, cull_disabled, diffuse_burley, specular_schlick_ggx;
 
 // ── 8 Gerstner waves: (dir_x, dir_z, amplitude, wavelength) ──────────────────
 uniform vec4 wave_a = vec4( 1.00,  0.00, 0.38, 22.0);
