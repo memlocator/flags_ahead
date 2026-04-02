@@ -55,14 +55,15 @@ extends Node3D
 @export_group("Macro Variation")
 @export var macro_str:       float = 0.55   ## Large-scale (~300–800 m) brightness patches — breaks long-range tiling
 
+@export_group("Foam Contact")
+@export var foam_contact_band: float = 0.35   ## metres at waterline that get foam
+@export var foam_contact_gain: float = 1.2    ## intensity of contact foam
+
 @export_group("Underwater FX")
 @export var underwater_env: Environment = null ## Optional environment to apply when camera is underwater
 @export var underwater_fog_density: float = 0.0 ## If >0, override env fog density while underwater
 @export var underwater_fog_color: Color = Color(0.08, 0.2, 0.3) ## Fog color override underwater
 
-@export_group("Foam Contact")
-@export var foam_contact_band: float = 0.3  ## metres below waterline that gets foam
-@export var foam_contact_gain: float = 0.6  ## intensity of contact foam
 
 const _WAVES: Array[Vector4] = [
 	Vector4( 1.00,  0.00, 0.38, 22.0),
@@ -164,8 +165,8 @@ func _process(delta: float) -> void:
 		m.set_shader_parameter("depth_fog_end",     depth_fog_end)
 		m.set_shader_parameter("foam_crest",        foam_crest)
 		m.set_shader_parameter("foam_threshold",    foam_threshold)
-		m.set_shader_parameter("foam_contact_band", foam_contact_band)
-		m.set_shader_parameter("foam_contact_gain", foam_contact_gain)
+		m.set_shader_parameter("foam_contact_band",   foam_contact_band)
+		m.set_shader_parameter("foam_contact_gain",   foam_contact_gain)
 		m.set_shader_parameter("is_underwater", is_underwater)
 		m.set_shader_parameter("color_deep",     color_deep)
 		m.set_shader_parameter("color_shallow",  color_shallow)

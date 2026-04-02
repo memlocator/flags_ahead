@@ -25,9 +25,9 @@ uniform vec4  color_foam    : source_color = vec4(0.87, 0.93, 0.97, 1.0);
 uniform float foam_crest        : hint_range(0.0, 1.0) = 0.72;
 // Background foam: density of the stochastic patch field (lower = more foam).
 uniform float foam_threshold    : hint_range(1.0, 2.5) = 1.85;
-// Contact foam: band width (metres) around the waterline, and intensity.
-uniform float foam_contact_band : hint_range(0.0, 2.0) = 0.3;
-uniform float foam_contact_gain : hint_range(0.0, 2.0) = 0.6;
+// Contact foam: band width (metres) at the waterline where objects meet the surface.
+uniform float foam_contact_band   : hint_range(0.0, 2.0) = 0.35;
+uniform float foam_contact_gain   : hint_range(0.0, 2.0) = 1.2;
 
 uniform float roughness_near  : hint_range(0.0, 1.0) = 0.16;  // roughness when looking straight down
 uniform float roughness_far   : hint_range(0.0, 1.0) = 0.32;  // roughness at grazing angles
@@ -351,14 +351,14 @@ void fragment() {
 	// Crest foam — driven by actual wave height, scales with wave_amp.
 	float crest_foam  = smoothstep(foam_crest * peak, peak, v_wave_y) * 0.65;
 
-	// Contact foam — thin band right at the waterline of any submerged geometry.
-	// Only fires when geometry is below the surface (world_y < surf_y) and
-	// within foam_contact_band metres of it.
-	float contact_foam = (world_y < surf_y)
-		? (1.0 - smoothstep(0.0, foam_contact_band, surf_y - world_y)) * foam_contact_gain
+	float contact_base = (world_y < surf_y)
+		? (1.0 - smoothstep(0.0, foam_contact_band, surf_y - world_y))
 		: 0.0;
+	// Lower bound shrinks as contact_base grows so the ring is dense at the hull and sparse at the edge.
+	float cn = _fbm(fwxz * 4.5 + vec2(t * 0.06, -t * 0.04));
+	float contact_foam = contact_base * smoothstep(0.35 - contact_base * 0.35, 0.70, cn) * foam_contact_gain;
 
-	float foam = max(foam_field, crest_foam) + contact_foam;
+	float foam = max(foam_field, crest_foam + contact_foam);
 	col = mix(col, color_foam.rgb, clamp(foam, 0.0, 1.0));
 
 	// Fake caustics — same sparse-product trick, finer spatial scale (~3 m features).

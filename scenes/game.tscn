@@ -59,10 +59,11 @@ shadow_enabled = true
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -3.25, 0)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Ground" unique_id=2049438336]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.560772, 0)
 shape = SubResource("BoxShape3D_ground")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Ground" unique_id=1231672845]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -9.536743e-07)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.560772, -9.536743e-07)
 mesh = SubResource("BoxMesh_ground")
 surface_material_override/0 = SubResource("Mat_ground")
 
@@ -111,7 +112,7 @@ config = ExtResource("9_sloop")
 script = ExtResource("8_interactable")
 
 [node name="BuoyancyBody" type="Node3D" parent="SkeletonsRoot/Sloop" unique_id=112233447]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.37103522, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.20669138, 0)
 script = ExtResource("11_buoyancy")
 buoyancy_strength = 90.0
 damping = 1.0
@@ -173,10 +174,11 @@ specular_str = 0.7
 sss_color = Color(0, 0.5331359, 0.54881036, 1)
 caustic_str = 0.65
 macro_str = 0.0
+foam_contact_band = null
+foam_contact_gain = null
+foam_contact_spread = null
 underwater_env = ExtResource("11_kvuet")
 underwater_fog_density = 0.5
-foam_contact_band = 0.6
-foam_contact_gain = 1.6
 
 [node name="BuildSystem" type="Node3D" parent="." unique_id=196088708]
 script = ExtResource("4_build")
