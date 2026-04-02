@@ -33,6 +33,7 @@ func _ready() -> void:
 
 	_ship_launcher = ShipLauncher.new()
 	_ship_launcher.ocean = ocean
+	_ship_launcher.ship_launched.connect(_on_ship_launched)
 	add_child(_ship_launcher)
 
 	# Wire up any interactables already in the scene
@@ -117,6 +118,30 @@ func _connect_interactable(interactable: ShipSkeletonInteractable) -> void:
 
 func _on_launch_requested(skeleton: ShipSkeleton) -> void:
 	_ship_launcher.launch(skeleton)
+
+
+func _on_ship_launched(body: RigidBody3D, placed: Node3D) -> void:
+	build_system.ship_root = body
+	_reparent_pieces.call_deferred(build_system.placed_pieces_node, placed)
+
+	var shelter := body.find_child("HullShelterArea", true, false) as Area3D
+	var mask_mi := body.find_child("HullDepthMask", true, false) as MeshInstance3D
+	if shelter:
+		shelter.body_entered.connect(func(b: Node3D) -> void:
+			if b != player: return
+			ocean.camera_sheltered = true
+			if mask_mi:
+				(mask_mi.material_override as ShaderMaterial).set_shader_parameter("camera_inside", true))
+		shelter.body_exited.connect(func(b: Node3D) -> void:
+			if b != player: return
+			ocean.camera_sheltered = false
+			if mask_mi:
+				(mask_mi.material_override as ShaderMaterial).set_shader_parameter("camera_inside", false))
+
+
+func _reparent_pieces(from: Node3D, to: Node3D) -> void:
+	for piece in from.get_children():
+		piece.reparent(to, true)
 
 
 func _on_interact_requested(skeleton: ShipSkeleton, interactable: ShipSkeletonInteractable) -> void:

@@ -79,6 +79,10 @@ var _time:      float = 0.0
 var _materials: Array[ShaderMaterial] = []
 var _last_underwater: bool = false
 var _orig_cam_env: Environment = null
+## Set to true while the camera is inside a hull or other shelter so the
+## underwater environment effect is suppressed even if geometry places the
+## camera below the wave surface.
+var camera_sheltered: bool = false
 
 
 func _ready() -> void:
@@ -140,7 +144,7 @@ func _process(delta: float) -> void:
 	var is_underwater := false
 	if cam:
 		var surf_y := global_position.y + _sample_wave_height(Vector2(cam.global_position.x, cam.global_position.z), t)
-		is_underwater = cam.global_position.y < surf_y - 0.2  # small tolerance to avoid flicker at surface
+		is_underwater = not camera_sheltered and cam.global_position.y < surf_y - 0.2
 		if is_underwater != _last_underwater:
 			print("Ocean is_underwater=", is_underwater, " cam_y=", cam.global_position.y, " surf_y=", surf_y)
 			_last_underwater = is_underwater
