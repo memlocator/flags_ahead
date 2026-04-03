@@ -112,18 +112,19 @@ config = ExtResource("9_sloop")
 script = ExtResource("8_interactable")
 
 [node name="BuoyancyBody" type="Node3D" parent="SkeletonsRoot/Sloop" unique_id=112233447]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.20669138, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.66969854, 0)
 script = ExtResource("11_buoyancy")
-buoyancy_strength = 125.0
+buoyancy_strength = 10.0
 damping = 0.1
-depth_exponent = 4.0
+depth_exponent = 1.0
+gravity_scale = 1.4
 
 [node name="SensorBowPort" type="Marker3D" parent="SkeletonsRoot/Sloop/BuoyancyBody" unique_id=112233450]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.4089216, -1.2999992)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.318736, 0.4089216, -1.2999992)
 script = ExtResource("12_sensor")
 
 [node name="SensorBowStarboard" type="Marker3D" parent="SkeletonsRoot/Sloop/BuoyancyBody" unique_id=112233451]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.4089216, 1.2999992)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.318736, 0.4089216, 1.2999992)
 script = ExtResource("12_sensor")
 
 [node name="SensorMidPort" type="Marker3D" parent="SkeletonsRoot/Sloop/BuoyancyBody" unique_id=112233452]

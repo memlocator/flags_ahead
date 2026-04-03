@@ -11,8 +11,12 @@ extends Node3D
 ## Force grows as depth^exponent. 1.0 = linear, 2.0 = quadratic (default).
 ## Higher values resist full submersion more strongly.
 @export_range(1.0, 4.0, 0.1) var depth_exponent: float = 2.0
+## Gravity multiplier applied through the sensors. Set this and the body's
+## gravity_scale to 0 so weight and buoyancy are balanced at the same points.
+@export var gravity_scale: float = 1.0
 
 var _sensors: Array[BuoyancySensor] = []
+var _body: RigidBody3D
 
 
 func _ready() -> void:
@@ -25,9 +29,11 @@ func _ready() -> void:
 func _physics_process(_delta: float) -> void:
 	if not ocean or _sensors.is_empty():
 		return
-	var body := _find_ancestor_of_type(self, RigidBody3D) as RigidBody3D
-	if not body:
-		return
+	if not _body:
+		_body = _find_ancestor_of_type(self, RigidBody3D) as RigidBody3D
+		if not _body:
+			return
+		_body.gravity_scale = 0.0
 
 	var n          := _sensors.size()
 	var ocean_base := ocean.global_position.y
@@ -36,20 +42,20 @@ func _physics_process(_delta: float) -> void:
 		var world_pt := sensor.global_position
 		var wave_y   := ocean_base + ocean.get_wave_height(world_pt.x, world_pt.z)
 		var depth    := wave_y - world_pt.y
-		# World-space offset from body origin — used for torque and as apply_force position
-		var offset   := world_pt - body.global_position
+		var offset   := world_pt - _body.global_position
+		var pt_vel   := _body.linear_velocity + _body.angular_velocity.cross(offset)
 
-		var force := Vector3.ZERO
+		# Weight distributed across sensors — replaces body gravity_scale so that
+		# gravity and buoyancy act at the same points (better torque balance).
+		var force := Vector3.DOWN * gravity_scale * 9.8 * _body.mass / n
+
 		if depth > 0.0:
-			force += Vector3.UP * buoyancy_strength * pow(depth, depth_exponent) * body.mass / n
-		# Damp vertical motion within 2 m of the surface so the ship tracks waves
-		# instead of free-falling through troughs
-		if absf(depth) < 2.0:
-			var pt_vel := body.linear_velocity + body.angular_velocity.cross(offset)
-			force     -= Vector3.UP * damping * pt_vel.y * body.mass / n
-		if force == Vector3.ZERO:
-			continue
-		body.apply_force(force, offset)
+			force += Vector3.UP * buoyancy_strength * pow(depth, depth_exponent) * _body.mass / n
+			force -= Vector3.UP * damping * pt_vel.y * _body.mass / n
+		elif depth > -1.0:
+			force -= Vector3.UP * damping * 0.25 * pt_vel.y * _body.mass / n
+
+		_body.apply_force(force, offset)
 
 
 static func _find_ancestor_of_type(node: Node, type: Variant) -> Node:
