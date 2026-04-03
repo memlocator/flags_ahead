@@ -37,7 +37,7 @@ static func snap_to_points(ghost_center: Vector3, ghost_basis: Basis,
 	var best_delta := Vector3.ZERO
 	for piece: ShipPiece in pieces:
 		var psz: Vector3 = PieceDefs.DEFS[piece.piece_type].size
-		var piece_pts := _snap_points(piece.global_position, piece.global_basis, psz)
+		var piece_pts := _snap_points(piece.global_position, piece.global_transform.basis.orthonormalized(), psz)
 		for gp: Vector3 in ghost_pts:
 			for pp: Vector3 in piece_pts:
 				var d := gp.distance_to(pp)

@@ -16,6 +16,8 @@ extends Node3D
 
 var _ship_editor: ShipEditor
 var _ship_launcher: ShipLauncher
+var _hull_mask_mat: ShaderMaterial
+var _camera_area: Area3D
 
 
 func _ready() -> void:
@@ -54,6 +56,7 @@ func _ready() -> void:
 
 	_add_crosshair()
 	_update_hud()
+	_add_camera_area()
 
 
 func _add_crosshair() -> void:
@@ -72,6 +75,18 @@ func _add_crosshair() -> void:
 
 func _process(_delta: float) -> void:
 	_update_hud()
+
+
+func _add_camera_area() -> void:
+	var shape := SphereShape3D.new()
+	shape.radius = 0.05
+	var col := CollisionShape3D.new()
+	col.shape = shape
+	_camera_area = Area3D.new()
+	_camera_area.collision_layer = 0
+	_camera_area.collision_mask  = 8  # HullShelterArea layer
+	_camera_area.add_child(col)
+	camera.add_child(_camera_area)
 
 
 func _update_hud() -> void:
@@ -124,19 +139,19 @@ func _on_ship_launched(body: RigidBody3D, placed: Node3D) -> void:
 	build_system.ship_root = body
 	_reparent_pieces.call_deferred(build_system.placed_pieces_node, placed)
 
-	var shelter := body.find_child("HullShelterArea", true, false) as Area3D
 	var mask_mi := body.find_child("HullDepthMask", true, false) as MeshInstance3D
-	if shelter:
-		shelter.body_entered.connect(func(b: Node3D) -> void:
-			if b != player: return
+	if mask_mi:
+		_hull_mask_mat = mask_mi.material_override as ShaderMaterial
+
+	if _camera_area:
+		_camera_area.area_entered.connect(func(_a: Area3D) -> void:
 			ocean.camera_sheltered = true
-			if mask_mi:
-				(mask_mi.material_override as ShaderMaterial).set_shader_parameter("camera_inside", true))
-		shelter.body_exited.connect(func(b: Node3D) -> void:
-			if b != player: return
+			if _hull_mask_mat:
+				_hull_mask_mat.set_shader_parameter("camera_inside", true))
+		_camera_area.area_exited.connect(func(_a: Area3D) -> void:
 			ocean.camera_sheltered = false
-			if mask_mi:
-				(mask_mi.material_override as ShaderMaterial).set_shader_parameter("camera_inside", false))
+			if _hull_mask_mat:
+				_hull_mask_mat.set_shader_parameter("camera_inside", false))
 
 
 func _reparent_pieces(from: Node3D, to: Node3D) -> void:

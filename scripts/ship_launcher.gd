@@ -143,8 +143,8 @@ func _add_hull_shelter_area(body: RigidBody3D, config: ShipConfig) -> void:
 
 	var area := Area3D.new()
 	area.name            = "HullShelterArea"
-	area.collision_layer = 0      # doesn't collide with anything itself
-	area.collision_mask  = 1      # monitors layer 1 (player)
+	area.collision_layer = 8      # layer 4 — queried by game.gd camera point test
+	area.collision_mask  = 0
 	area.add_child(col)
 	body.add_child(area)
 

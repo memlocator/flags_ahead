@@ -140,8 +140,8 @@ static func build_hull_panel(pts_a: PackedVector3Array, pts_b: PackedVector3Arra
 	return root
 
 
-static func hull_panel_convex(pts_a: PackedVector3Array, pts_b: PackedVector3Array) -> ConvexPolygonShape3D:
-	return _hull_panel_convex(pts_a, pts_b)
+static func hull_panel_trimesh(pts_a: PackedVector3Array, pts_b: PackedVector3Array) -> ConcavePolygonShape3D:
+	return _hull_panel_trimesh(pts_a, pts_b)
 
 
 static func build_hull_panel_ghost(pts_a: PackedVector3Array, pts_b: PackedVector3Array) -> Node3D:
@@ -164,12 +164,17 @@ static func _hull_panel_mesh(pts_a: PackedVector3Array, pts_b: PackedVector3Arra
 	return mi
 
 
-static func _hull_panel_convex(pts_a: PackedVector3Array, pts_b: PackedVector3Array) -> ConvexPolygonShape3D:
-	var pts := PackedVector3Array()
-	for p: Vector3 in pts_a: pts.append(p)
-	for p: Vector3 in pts_b: pts.append(p)
-	var shape := ConvexPolygonShape3D.new()
-	shape.points = pts
+static func _hull_panel_trimesh(pts_a: PackedVector3Array, pts_b: PackedVector3Array) -> ConcavePolygonShape3D:
+	var faces := PackedVector3Array()
+	var n := pts_a.size()
+	for i in range(n - 1):
+		var a := pts_a[i];  var b := pts_b[i]
+		var c := pts_a[i + 1]; var d := pts_b[i + 1]
+		faces.append(a); faces.append(b); faces.append(c)
+		faces.append(b); faces.append(d); faces.append(c)
+	var shape := ConcavePolygonShape3D.new()
+	shape.backface_collision = true
+	shape.set_faces(faces)
 	return shape
 
 

@@ -68,7 +68,7 @@ mesh = SubResource("BoxMesh_ground")
 surface_material_override/0 = SubResource("Mat_ground")
 
 [node name="Ground" type="StaticBody3D" parent="Ground" unique_id=754836613]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -46.70761, -3.8781796, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -46.70761, -5.0372314, 0)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Ground/Ground" unique_id=1405543522]
 shape = SubResource("BoxShape3D_ground")
@@ -102,7 +102,7 @@ spring_length = 2.0
 [node name="Camera3D" type="Camera3D" parent="CameraPivot/SpringArm3D" unique_id=123456789]
 
 [node name="SkeletonsRoot" type="Node3D" parent="." unique_id=298765432]
-transform = Transform3D(-5.9604645e-08, 0, -1, 0, 1, 0, 1, 0, -5.9604645e-08, -32.24369, -1.6370164, -16.236477)
+transform = Transform3D(-5.9604645e-08, 0, -1, 0, 1, 0, 1, 0, -5.9604645e-08, -33.637035, -3.0922375, -19.073404)
 
 [node name="Sloop" type="Node3D" parent="SkeletonsRoot" unique_id=112233445]
 script = ExtResource("3_skel")
@@ -114,8 +114,8 @@ script = ExtResource("8_interactable")
 [node name="BuoyancyBody" type="Node3D" parent="SkeletonsRoot/Sloop" unique_id=112233447]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.20669138, 0)
 script = ExtResource("11_buoyancy")
-buoyancy_strength = 90.0
-damping = 1.0
+buoyancy_strength = 125.0
+damping = 0.1
 depth_exponent = 4.0
 
 [node name="SensorBowPort" type="Marker3D" parent="SkeletonsRoot/Sloop/BuoyancyBody" unique_id=112233450]
@@ -160,7 +160,7 @@ inner_subdivs = 1500
 outer_subdivs = 150
 far_size = 15000.0
 far_subdivs = 150
-wave_amp = 0.5
+wave_amp = 0.0
 steepness = 0.1
 chop_amp = 0.1
 chop_scale = 0.2
@@ -168,6 +168,8 @@ detail_strength = 0.1
 clarity = 0.8
 depth_fog_start = 0.1
 depth_fog_end = 2.0
+foam_crest = 0.7
+foam_threshold = 2.0
 color_deep = Color(0.04949283, 0.29426005, 0.35247186, 1)
 color_shallow = Color(0.0029358075, 0.20479247, 0.34123835, 1)
 roughness_near = 0.0
@@ -175,8 +177,6 @@ specular_str = 0.7
 sss_color = Color(0, 0.5331359, 0.54881036, 1)
 caustic_str = 0.65
 macro_str = 1.0
-foam_contact_band = null
-foam_contact_gain = null
 underwater_env = ExtResource("11_kvuet")
 underwater_fog_density = 0.5
 
@@ -206,3 +206,14 @@ text = "Loading..."
 transform = Transform3D(300, 0, 0, 0, 1, 0, 0, 0, 300, -81.28996, -14.169761, -0.045967102)
 mesh = SubResource("BoxMesh_ground")
 surface_material_override/0 = SubResource("StandardMaterial3D_vtaks")
+
+[node name="Ground2" type="StaticBody3D" parent="." unique_id=1865488904]
+transform = Transform3D(0.16796716, -0.62875247, 0, -0.13350184, -0.7910735, 0, 0, 0, 0.050296366, -26.01685, -2.8526511, -16.767365)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Ground2" unique_id=1465644238]
+shape = SubResource("BoxShape3D_ground")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Ground2" unique_id=803783757]
+transform = Transform3D(1, 0, 0, -3.7252903e-09, 1, 0, 0, 0, 1, 2.6681519, 0.38926888, 0)
+mesh = SubResource("BoxMesh_ground")
+surface_material_override/0 = SubResource("Mat_ground")

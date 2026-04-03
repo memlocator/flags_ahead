@@ -66,6 +66,7 @@ var _hull_panel_bay_a: float = 9999.0
 var _hull_panel_bay_b: float = 9999.0
 var _hull_panel_bay_side: float = 0.0
 var _hull_panel_stations: Array[float] = []
+var _hull_panel_cfg_scale: float = -1.0
 
 # Deck panel state
 var _deck_panel_pts_a: PackedVector3Array
@@ -75,6 +76,7 @@ var _deck_panel_bay_a: float = 9999.0
 var _deck_panel_bay_b: float = 9999.0
 var _deck_panel_deck_y: float = 9999.0
 var _deck_panel_stations: Array[float] = []
+var _deck_panel_cfg_scale: float = -1.0
 
 
 func _ready() -> void:
@@ -360,8 +362,8 @@ func _process_hull_panel(result: Dictionary) -> void:
 	var side      := signf(hit_local.z)
 	if is_zero_approx(side): side = 1.0
 
-	# Cache bay_stations per skeleton — config doesn't change at runtime
-	if skel != _hull_panel_skel or _hull_panel_stations.is_empty():
+	if skel != _hull_panel_skel or _hull_panel_stations.is_empty() \
+			or cfg_hp.scale_factor != _hull_panel_cfg_scale:
 		_hull_panel_stations = cfg_hp.bay_stations()
 
 	# Find the bay (pair of adjacent stations) the cursor is in
@@ -376,11 +378,13 @@ func _process_hull_panel(result: Dictionary) -> void:
 			break
 
 	if bay_a != _hull_panel_bay_a or bay_b != _hull_panel_bay_b \
-			or side != _hull_panel_bay_side or _hull_panel_skel != skel:
+			or side != _hull_panel_bay_side or _hull_panel_skel != skel \
+			or cfg_hp.scale_factor != _hull_panel_cfg_scale:
 		_hull_panel_bay_a    = bay_a
 		_hull_panel_bay_b    = bay_b
 		_hull_panel_bay_side = side
 		_hull_panel_skel     = skel
+		_hull_panel_cfg_scale = cfg_hp.scale_factor
 		_hull_panel_pts_a    = _bay_profile(skel, bay_a, side)
 		_hull_panel_pts_b    = _bay_profile(skel, bay_b, side)
 		_rebuild_hull_panel_ghost()
@@ -421,7 +425,7 @@ func _place_hull_panel() -> void:
 	piece.add_child(PieceMeshBuilder.build_hull_panel(_hull_panel_pts_a, _hull_panel_pts_b))
 	# Add collision directly to the StaticBody3D so raycasts on layer 2 block the ghost
 	var cs := CollisionShape3D.new()
-	cs.shape = PieceMeshBuilder.hull_panel_convex(_hull_panel_pts_a, _hull_panel_pts_b)
+	cs.shape = PieceMeshBuilder.hull_panel_trimesh(_hull_panel_pts_a, _hull_panel_pts_b)
 	piece.add_child(cs)
 	_container_for(_hull_panel_skel).add_child(piece)
 	piece.global_position = _hull_panel_skel.global_position
@@ -452,7 +456,8 @@ func _process_deck_panel(result: Dictionary) -> void:
 	var cfg: ShipConfig = skel._get_config()
 	var hit_local := skel.to_local(result.position) / cfg.scale_factor
 
-	if skel != _deck_panel_skel or _deck_panel_stations.is_empty():
+	if skel != _deck_panel_skel or _deck_panel_stations.is_empty() \
+			or cfg.scale_factor != _deck_panel_cfg_scale:
 		_deck_panel_stations = cfg.bay_stations()
 
 	# Snap to the nearest deck height (raw comparison — hit_local is already in raw space)
@@ -473,11 +478,13 @@ func _process_deck_panel(result: Dictionary) -> void:
 			break
 
 	if bay_a != _deck_panel_bay_a or bay_b != _deck_panel_bay_b \
-			or deck_y != _deck_panel_deck_y or skel != _deck_panel_skel:
-		_deck_panel_bay_a   = bay_a
-		_deck_panel_bay_b   = bay_b
-		_deck_panel_deck_y  = deck_y
-		_deck_panel_skel    = skel
+			or deck_y != _deck_panel_deck_y or skel != _deck_panel_skel \
+			or cfg.scale_factor != _deck_panel_cfg_scale:
+		_deck_panel_bay_a      = bay_a
+		_deck_panel_bay_b      = bay_b
+		_deck_panel_deck_y     = deck_y
+		_deck_panel_skel       = skel
+		_deck_panel_cfg_scale  = cfg.scale_factor
 		_deck_panel_pts_a   = _bay_deck_profile(cfg, bay_a, deck_y)
 		_deck_panel_pts_b   = _bay_deck_profile(cfg, bay_b, deck_y)
 		_clear_node_children(ghost_mesh_node)
@@ -519,7 +526,7 @@ func _place_deck_panel() -> void:
 	piece.setup(&"deck_panel", false)
 	piece.add_child(PieceMeshBuilder.build_hull_panel(_deck_panel_pts_a, _deck_panel_pts_b))
 	var cs := CollisionShape3D.new()
-	cs.shape = PieceMeshBuilder.hull_panel_convex(_deck_panel_pts_a, _deck_panel_pts_b)
+	cs.shape = PieceMeshBuilder.hull_panel_trimesh(_deck_panel_pts_a, _deck_panel_pts_b)
 	piece.add_child(cs)
 	_container_for(_deck_panel_skel).add_child(piece)
 	piece.global_position = _deck_panel_skel.global_position
@@ -552,7 +559,7 @@ func _spawn_piece(type: StringName, pos: Vector3, piece_basis: Basis) -> ShipPie
 	piece.add_child(PieceMeshBuilder.build_piece(type))
 	_container_for(_last_hit_skel).add_child(piece)
 	piece.global_position = pos
-	piece.basis = piece_basis
+	piece.global_basis = piece_basis
 	placed_pieces.append(piece)
 	return piece
 

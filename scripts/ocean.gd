@@ -191,9 +191,18 @@ func get_wave_height(world_x: float, world_z: float) -> float:
 
 
 func _sample_wave_height(xz: Vector2, t: float) -> float:
+	# Match the shader exactly: 6 vertex waves only (g/h live in the normal map),
+	# with the same phase noise offsets applied per-wave.
+	var pn1 := _vnoise(xz * 0.025) * 3.2 + _vnoise(xz * 0.008) * 2.8
+	var pn2 := _vnoise(xz * 0.025 + Vector2(4.1, 7.3)) * 3.2 + _vnoise(xz * 0.008 + Vector2(4.1, 7.3)) * 2.8
+	var pn3 := _vnoise(xz * 0.031 + Vector2(9.7, 2.5)) * 2.8 + _vnoise(xz * 0.011 + Vector2(3.6, 6.8)) * 2.4
 	var y := 0.0
-	for wave: Vector4 in _WAVES:
-		y += _gerstner_y(wave, xz, t)
+	y += _gerstner_y(_WAVES[0], xz, t, pn1 * 1.0)
+	y += _gerstner_y(_WAVES[1], xz, t, pn2 * 0.8)
+	y += _gerstner_y(_WAVES[2], xz, t, pn3 * 1.2)
+	y += _gerstner_y(_WAVES[3], xz, t, pn1 * 0.6)
+	y += _gerstner_y(_WAVES[4], xz, t, pn2 * 1.4)
+	y += _gerstner_y(_WAVES[5], xz, t, pn3 * 0.9)
 	return y
 
 
@@ -221,9 +230,25 @@ func _apply_underwater_fx(under: bool) -> void:
 		cam.environment = _orig_cam_env
 
 
-func _gerstner_y(wave: Vector4, xz: Vector2, t: float) -> float:
+func _gerstner_y(wave: Vector4, xz: Vector2, t: float, phase: float = 0.0) -> float:
 	var d := Vector2(wave.x, wave.y).normalized()
 	var k := TAU / wave.w
 	var c := sqrt(9.8 / k)
-	var f := k * (d.dot(xz) - c * t)
-	return wave.z * wave_amp * sin(f)
+	var f := k * (d.dot(xz) - c * t) + phase
+	var eff := wave_amp if wave_amp < 2.0 else sqrt(wave_amp * 2.0)
+	return wave.z * eff * sin(f)
+
+
+static func _hash(p: Vector2) -> float:
+	return fposmod(sin(p.dot(Vector2(127.1, 311.7))) * 43758.5453, 1.0)
+
+
+static func _vnoise(p: Vector2) -> float:
+	var i := Vector2(floor(p.x), floor(p.y))
+	var f := Vector2(fposmod(p.x, 1.0), fposmod(p.y, 1.0))
+	var ux := f.x * f.x * f.x * (f.x * (f.x * 6.0 - 15.0) + 10.0)
+	var uy := f.y * f.y * f.y * (f.y * (f.y * 6.0 - 15.0) + 10.0)
+	return lerpf(
+		lerpf(_hash(i),                      _hash(i + Vector2(1.0, 0.0)), ux),
+		lerpf(_hash(i + Vector2(0.0, 1.0)), _hash(i + Vector2(1.0, 1.0)), ux),
+		uy)

@@ -11,7 +11,7 @@ uniform vec4 wave_f = vec4(-0.81,  0.59, 0.04,  3.8);
 uniform vec4 wave_g = vec4( 0.31, -0.95, 0.03,  2.7);
 uniform vec4 wave_h = vec4( 0.93,  0.37, 0.02,  1.8);
 
-uniform float wave_amp        : hint_range(0.0, 4.0) = 1.0;
+uniform float wave_amp        : hint_range(0.0, 12.0) = 1.0;
 uniform float steepness       : hint_range(0.0, 1.0) = 0.38;
 uniform float wave_time       = 0.0;
 uniform float chop_amp        : hint_range(0.0, 2.0) = 0.10;
@@ -181,16 +181,18 @@ vec2 _gabor_slope(vec2 p, vec2 dir, float t,
 
 
 // ── Gerstner wave ─────────────────────────────────────────────────────────────
+// Sublinear amplitude scaling: linear up to wave_amp=2, sqrt above that.
+// Keeps waves dramatic without reaching physically impossible heights at high values.
+float _scaled_amp() { return wave_amp < 2.0 ? wave_amp : sqrt(wave_amp * 2.0); }
 
 vec3 _gerstner(vec4 wave, float phase, vec2 xz, float t,
                inout vec3 tan, inout vec3 bin) {
 	vec2  d = normalize(wave.xy);
-	// Only amplitude scales with wave_amp — wavelength stays fixed so waves get steeper, not just bigger.
-	// Folding limit: steepness * wave_amp * sum(a_i * k_i) must stay below 1. Safe up to ~wave_amp 4.
 	float k = 6.28318 / wave.w;
 	float c = sqrt(9.8 / k);
-	float q = steepness;
-	float a = wave.z * wave_amp;
+	float eff = _scaled_amp();
+	float q   = min(steepness, 0.90 / max(1.0, eff * 0.483));
+	float a   = wave.z * eff;
 	float f = k * (dot(d, xz) - c * t) + phase;
 
 	tan += vec3(-q * d.x * d.x * a * k * sin(f),
@@ -212,7 +214,7 @@ vec2 _wave_slope(vec4 wave, vec2 xz, float t, float phase_offset) {
 	vec2  d = normalize(wave.xy);
 	float k = TAU / wave.w;
 	float c = sqrt(9.8 / k);
-	float a = wave.z * wave_amp;
+	float a = wave.z * _scaled_amp();
 	float f = k * dot(d, xz) - k * c * t + phase_offset;
 	return d * (a * k * cos(f));
 }
